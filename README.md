@@ -49,10 +49,6 @@ This screenshot was taken by the character "MyCharacter" in "The Waking Sands" a
 
 Contributions are welcome\!  If you have suggestions, bug reports, or would like to contribute code, please feel free to open issues or pull requests on this GitHub repository.
 
-## Credits
-
-  * Developed by [Your GitHub Username/Name]
-
 -----
 
 **Enjoy your sightseeing and happy screenshotting\!**
