@@ -1,10 +1,16 @@
+# Sightseeingway
+
+> Take Sightseeingway with you\! This Dalamud addon for FFXIV automatically names your screenshots with character and location info, so you can always find that perfect vista again.
+
+-----
+
 ## Description
 
 **Sightseeingway** is a Dalamud addon for Final Fantasy XIV designed to enhance your screenshot organization.  It automatically renames your saved screenshots to include valuable information directly in the filename:
 
   * **Character Name:**  Know exactly which character took the screenshot.
   * **Map Name:**  Quickly identify the in-game zone where the screenshot was taken.
-  * **Coordinates (X, Y):** Pinpoint the exact location on the map.
+  * **Coordinates (X, Y, Z):** Pinpoint the exact location on the map, including altitude if available.
 
 This addon is perfect for:
 
@@ -16,9 +22,8 @@ No more generic screenshot names like `ffxiv_001.png`\!  Sightseeingway helps yo
 
 ## Features
 
-  * **Automatic Screenshot Renaming:** Renames screenshots immediately upon saving.
-  * **Customizable Filename Format:** Allows users to customize the order and elements included in the filename.
-  * **Lightweight and Easy to Use:** Simple drop-in addon with no complex configurations.
+  * **Automatic Screenshot Renaming:**  Renames screenshots immediately upon saving.
+  * **Lightweight and Easy to Use:**  Simple drop-in addon with no complex configurations.
 
 ## Installation
 
@@ -31,13 +36,20 @@ No more generic screenshot names like `ffxiv_001.png`\!  Sightseeingway helps yo
 
 Sightseeingway works automatically in the background\!  Simply take screenshots as you normally would in FFXIV.  When you save a screenshot, Sightseeingway will automatically rename it with the following format:
 
-`[Timestamp]_[CharacterName]_[MapName]_[X-Coordinate][Y-Coordinate].png`
+`[Timestamp]_[CharacterName]_[MapName]_[X-Coordinate][Y-Coordinate][Z-Coordinate].png`
+
+*   **Timestamp:**  `YYYYMMDDHHMMSSmilliseconds` (e.g., `20250222135356123` for February 22, 2025, 1:53:56 PM and 123 milliseconds). Timestamps are in your local time.
+*   **CharacterName:** Your character's name.
+*   **MapName:** The name of the in-game map (e.g., "The Waking Sands").
+*   **X-Coordinate:**  The X coordinate on the map.
+*   **Y-Coordinate:**  The Y coordinate on the map.
+*   **Z-Coordinate:**  The Z coordinate on the map (if available).
 
 **Example:**
 
-`20250101120000000-MyCharacter_TheWakingSands_X12_Y34.png`
+`20250222135356123_MyCharacter_TheWakingSands_X12Y34Z56.png`
 
-This screenshot was taken by the character "MyCharacter" in "The Waking Sands" at coordinates X:12, Y:34.
+This screenshot was taken on February 22, 2025, at 1:53:56 PM and 123 milliseconds (local time), by the character "MyCharacter" in "The Waking Sands" at coordinates X:12, Y:34, and Z:56.
 
 ## Planned Features (Future Development)
 
