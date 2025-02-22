@@ -1,81 +1,66 @@
-﻿using Dalamud.Game.Command;
+using Dalamud.Game.Command;
 using Dalamud.IoC;
 using Dalamud.Plugin;
 using System.IO;
-using Dalamud.Interface.Windowing;
 using Dalamud.Plugin.Services;
-using SamplePlugin.Windows;
+using SamplePlugin;
+using System;
+using System.Numerics;
 
-namespace SamplePlugin;
-
-public sealed class Plugin : IDalamudPlugin
+namespace Sightseeingway
 {
-    [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
-    [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
-    [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
-    [PluginService] internal static IClientState ClientState { get; private set; } = null!;
-    [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
-    [PluginService] internal static IPluginLog Log { get; private set; } = null!;
-
-    private const string CommandName = "/pmycommand";
-
-    public Configuration Configuration { get; init; }
-
-    public readonly WindowSystem WindowSystem = new("SamplePlugin");
-    private ConfigWindow ConfigWindow { get; init; }
-    private MainWindow MainWindow { get; init; }
-
-    public Plugin()
+    public sealed class Sightseeingway : IDalamudPlugin
     {
-        Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+        [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
+        [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
+        [PluginService] internal static IFramework Framework { get; private set; } = null!;
+        [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
+        [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+        [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
+        [PluginService] internal static IPluginLog Log { get; private set; } = null!;
 
-        // you might normally want to embed resources and load them from the manifest stream
-        var goatImagePath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "goat.png");
+        private const string CommandName = "/sightseeingway";
 
-        ConfigWindow = new ConfigWindow(this);
-        MainWindow = new MainWindow(this, goatImagePath);
+        public Configuration Configuration { get; init; }
 
-        WindowSystem.AddWindow(ConfigWindow);
-        WindowSystem.AddWindow(MainWindow);
-
-        CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+        public Sightseeingway()
         {
-            HelpMessage = "A useful message to display in /xlhelp"
-        });
+            Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            
 
-        PluginInterface.UiBuilder.Draw += DrawUI;
+            Framework.OnScreenshotTaken += OnScreenshotTaken;
 
-        // This adds a button to the plugin installer entry of this plugin which allows
-        // to toggle the display status of the configuration ui
-        PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUI;
+            CommandManager.AddHandler(CommandName, new CommandInfo(OnCommand)
+            {
+                HelpMessage = "A useful message to display in /xlhelp"
+            });
+        }
 
-        // Adds another button that is doing the same but for the main ui of the plugin
-        PluginInterface.UiBuilder.OpenMainUi += ToggleMainUI;
+        public void Dispose()
+        {
+            PluginInterface.Framework.OnScreenshotTaken -= OnScreenshotTaken;
+            CommandManager.RemoveHandler(CommandName);
+        }
 
-        // Add a simple message to the log with level set to information
-        // Use /xllog to open the log window in-game
-        // Example Output: 00:57:54.959 | INF | [SamplePlugin] ===A cool log message from Sample Plugin===
-        Log.Information($"===A cool log message from {PluginInterface.Manifest.Name}===");
+        private void OnCommand(string command, string args)
+        {
+            // Implement your command logic here
+            // For example, you could toggle the visibility of your main window
+        }
+
+        private void OnScreenshotTaken(XivScreenshot screenshot)
+        {
+            // Get necessary information from the screenshot
+            string characterName = ClientState.LocalPlayer?.Name.TextValue;
+            string mapName = ClientState.TerritoryType.Name;
+            Vector3 position = ClientState.LocalPlayer.Position;
+
+            // Format the filename
+            string timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff");
+            string filename = $"{timestamp}_{characterName}_{mapName}_X{position.X:0.00}_Y{position.Y:0.00}_Z{position.Z:0.00}.png";
+
+            // Construct the new file path
+            string newFilePath = Path.Combine(screenshot.DirectoryPath, filename);
+        }
     }
-
-    public void Dispose()
-    {
-        WindowSystem.RemoveAllWindows();
-
-        ConfigWindow.Dispose();
-        MainWindow.Dispose();
-
-        CommandManager.RemoveHandler(CommandName);
-    }
-
-    private void OnCommand(string command, string args)
-    {
-        // in response to the slash command, just toggle the display status of our main ui
-        ToggleMainUI();
-    }
-
-    private void DrawUI() => WindowSystem.Draw();
-
-    public void ToggleConfigUI() => ConfigWindow.Toggle();
-    public void ToggleMainUI() => MainWindow.Toggle();
 }
