@@ -1,6 +1,6 @@
 # Sightseeingway
 
-> Take Sightseeingway with you\! This Dalamud addon for FFXIV automatically names your screenshots with character and location info, so you can always find that perfect vista again.
+Take Sightseeingway with you\! This Dalamud addon for FFXIV automatically names your screenshots with character and location info, so you can always find that perfect vista again.
 
 -----
 
