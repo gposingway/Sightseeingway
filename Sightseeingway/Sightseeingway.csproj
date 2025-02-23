@@ -2,8 +2,8 @@
 <Project Sdk="Dalamud.NET.SDK/11.0.0">
   <PropertyGroup>
     <Version>0.0.0.1</Version>
-    <Description>A sample plugin.</Description>
-    <PackageProjectUrl>https://github.com/goatcorp/SamplePlugin</PackageProjectUrl>
+    <Description>Automatically rename your screenshots with character and location info.</Description>
+    <PackageProjectUrl>https://github.com/gposingway/Sightseeingway</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
   </PropertyGroup>
