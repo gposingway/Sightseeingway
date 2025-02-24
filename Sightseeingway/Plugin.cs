@@ -12,9 +12,14 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Dalamud.Utility;
 
+using Dalamud.Interface.Windowing;
+using Sightseeingway.Windows;
+
+
 namespace Sightseeingway
 {
-    public sealed class Sightseeingway : IDalamudPlugin
+
+    public sealed class Plugin : IDalamudPlugin
     {
         [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
         [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
@@ -30,16 +35,29 @@ namespace Sightseeingway
         private readonly Dictionary<string, DateTime> renamedFilesCache = [];
         private readonly TimeSpan cacheDuration = TimeSpan.FromMinutes(1);
 
-        public Sightseeingway()
+        public Configuration Configuration { get; init; }
+        public readonly WindowSystem WindowSystem = new("Sightseeingway");
+        private ConfigWindow ConfigWindow { get; init; }
+
+        public Plugin()
         {
+            Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+
+            var imagePath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "icon.png");
+            ConfigWindow = new ConfigWindow(this);
+            PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUI;
+
             Log.Debug("Plugin constructor started.");
             ChatGui.Print($"[Sightseeingway] Plugin Initializing...");
 
             InitializeFoldersToMonitor();
             InitializeWatchers();
+
             Log.Debug("Plugin constructor finished.");
             ChatGui.Print($"[Sightseeingway] Plugin Initialized. Monitoring screenshot folders with filename caching.");
         }
+
+        public void ToggleConfigUI() => ConfigWindow.Toggle();
 
         private string GetGameDirectory()
         {
