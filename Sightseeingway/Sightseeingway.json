@@ -6,8 +6,8 @@
     "ApplicableVersion": "any",
     "Tags": [
         "screenshot",
-        "rename",
-        "utility",
-        "ffxiv"
-    ]
+        "gpose",
+        "utility"
+    ],
+    "IconUrl": "https://raw.githubusercontent.com/LeonAquitaine/Sightseeingway/main/Sightseeingway.png",
 }
