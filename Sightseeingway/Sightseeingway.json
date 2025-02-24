@@ -2,7 +2,7 @@
     "Author": "Leon Aquitaine",
     "Name": "Sightseeingway",
     "Punchline": "Automatically rename your screenshots with character and location info.",
-    "Description": "Renames screenshots as they are created to include character name, map name, and coordinates. Monitors default screenshot folder and Reshade SavePath. No slash commands implemented yet.",
+    "Description": "Renames screenshots as they are created to include character name, map name, and coordinates. Monitors default and Reshade screenshots.",
     "ApplicableVersion": "any",
     "Tags": [
         "screenshot",

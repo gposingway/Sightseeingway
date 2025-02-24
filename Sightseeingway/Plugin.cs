@@ -288,11 +288,10 @@ namespace Sightseeingway
                 }
                 else
                 {
-                    Log.Warning("Map sheet not found or MapId is 0, using default 'nowhere' for map name.");
+                    Log.Warning("Map sheet not found or MapId is 0.");
                 }
 
                 var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
-                var newFilename = $"{timestamp}_{characterName}_{mapName}{posPart}";
 
 
                 if (!characterName.IsNullOrEmpty()) characterName = "-" + characterName;
@@ -300,8 +299,7 @@ namespace Sightseeingway
                 if (!presetName.IsNullOrEmpty()) presetName = "-" + presetName;
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-                    newFilename = $"{timestamp}{characterName}{mapName}{posPart}{presetName}{extension}";
-
+                var newFilename = $"{timestamp}{characterName}{mapName}{posPart}{presetName}{extension}";
 
                 var directory = Path.GetDirectoryName(filePath);
                 var newFilePath = Path.Combine(directory, newFilename);
