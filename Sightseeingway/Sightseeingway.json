@@ -9,5 +9,6 @@
         "gpose",
         "utility"
     ],
-    "IconUrl": "https://raw.githubusercontent.com/gposingway/Sightseeingway/refs/heads/master/Sightseeingway/icon.png"
+    "IconUrl": "https://raw.githubusercontent.com/gposingway/Sightseeingway/refs/heads/master/Sightseeingway/icon.png",
+    "RepoUrl": "https://github.com/gposingway/Sightseeingway"
 }

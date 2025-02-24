@@ -8,19 +8,20 @@ namespace Sightseeingway.Windows
     public class ConfigWindow : Window, IDisposable
     {
         private Configuration Configuration;
+        private readonly Plugin _Plugin;
 
         // We give this window a constant ID using ###
         // This allows for labels being dynamic, like "{FPS Counter}fps###XYZ counter window",
         // and the window ID will always be "###XYZ counter window" for ImGui
-        public ConfigWindow(Plugin plugin) : base("A Wonderful Configuration Window###With a constant ID")
+        public ConfigWindow(Plugin plugin) : base("Configuration###Bundlingway Configuration")
         {
-            Flags = ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar |
-                    ImGuiWindowFlags.NoScrollWithMouse;
+            Flags = ImGuiWindowFlags.NoResize | ImGuiWindowFlags.NoCollapse | ImGuiWindowFlags.NoScrollbar | ImGuiWindowFlags.NoScrollWithMouse;
 
             Size = new Vector2(232, 90);
             SizeCondition = ImGuiCond.Always;
 
             Configuration = plugin.Configuration;
+            _Plugin = plugin;
         }
 
         public void Dispose() { }

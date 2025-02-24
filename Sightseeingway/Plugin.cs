@@ -12,10 +12,6 @@ using System.Linq;
 using System.Text.RegularExpressions;
 using Dalamud.Utility;
 
-using Dalamud.Interface.Windowing;
-using Sightseeingway.Windows;
-
-
 namespace Sightseeingway
 {
 
@@ -36,28 +32,25 @@ namespace Sightseeingway
         private readonly TimeSpan cacheDuration = TimeSpan.FromMinutes(1);
 
         public Configuration Configuration { get; init; }
-        public readonly WindowSystem WindowSystem = new("Sightseeingway");
-        private ConfigWindow ConfigWindow { get; init; }
 
-        public Plugin()
+        // Static debug flag
+        public static bool DEBUG = false;
+
+        public Plugin()
         {
             Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-            var imagePath = Path.Combine(PluginInterface.AssemblyLocation.Directory?.FullName!, "icon.png");
-            ConfigWindow = new ConfigWindow(this);
-            PluginInterface.UiBuilder.OpenConfigUi += ToggleConfigUI;
-
             Log.Debug("Plugin constructor started.");
-            ChatGui.Print($"[Sightseeingway] Plugin Initializing...");
+            PrintChatMessage("Plugin Initializing...");
+
+            ChatGui.Print($"[Sightseeingway] Ready to help, friend!");
 
             InitializeFoldersToMonitor();
             InitializeWatchers();
 
             Log.Debug("Plugin constructor finished.");
-            ChatGui.Print($"[Sightseeingway] Plugin Initialized. Monitoring screenshot folders with filename caching.");
+            PrintChatMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
         }
-
-        public void ToggleConfigUI() => ConfigWindow.Toggle();
 
         private string GetGameDirectory()
         {
@@ -69,6 +62,7 @@ namespace Sightseeingway
             catch (Exception ex)
             {
                 Log.Error($"Error getting game directory from current process: {ex}. Falling back to plugin directory.");
+                ChatGui.PrintError($"[Sightseeingway] Error getting game directory: {ex.Message}");
                 return PluginInterface.AssemblyLocation.DirectoryName ?? ".";
             }
         }
@@ -126,7 +120,7 @@ namespace Sightseeingway
                         {
                             foldersToMonitor.Add(resolvedSavePath);
                             Log.Debug($"Reshade SavePath folder added: {resolvedSavePath}");
-                            ChatGui.Print($"[Sightseeingway] Debug: Reshade SavePath folder added: {resolvedSavePath}");
+                            PrintChatMessage($"Debug: Reshade SavePath folder added: {resolvedSavePath}");
                         }
                         else
                         {
@@ -147,7 +141,7 @@ namespace Sightseeingway
             else
             {
                 Log.Debug($"reshade.ini not found in game folder: {reshadeIniPath}");
-                ChatGui.Print($"[Sightseeingway] Debug: reshade.ini not found in game folder: {reshadeIniPath}");
+                PrintChatMessage($"Debug: reshade.ini not found in game folder: {reshadeIniPath}");
             }
             Log.Debug("InitializeFoldersToMonitor finished.");
         }
@@ -165,7 +159,7 @@ namespace Sightseeingway
                     watcher.EnableRaisingEvents = true;
                     watchers.Add(watcher);
                     Log.Information($"Monitoring folder: {folder}");
-                    ChatGui.Print($"[Sightseeingway] Monitoring folder: {folder}");
+                    PrintChatMessage($"Monitoring folder: {folder}");
                 }
                 else
                 {
@@ -179,7 +173,8 @@ namespace Sightseeingway
         public void Dispose()
         {
             Log.Debug("Dispose started.");
-            ChatGui.Print($"[Sightseeingway] Plugin Disposing...");
+            PrintChatMessage("Plugin Disposing...");
+
             foreach (var watcher in watchers)
             {
                 Log.Debug($"Disposing watcher for folder: {watcher.Path}");
@@ -190,7 +185,7 @@ namespace Sightseeingway
             watchers.Clear();
             Log.Debug("Watcher list cleared.");
             Log.Debug("Dispose finished.");
-            ChatGui.Print($"[Sightseeingway] Plugin Disposed.");
+            PrintChatMessage("Plugin Disposed.");
         }
 
         private void OnFileCreated(object sender, FileSystemEventArgs e)
@@ -198,12 +193,12 @@ namespace Sightseeingway
             var filePath = e.FullPath;
             var fileName = e.Name;
             Log.Debug($"File Created event triggered for: {filePath}");
-            ChatGui.Print($"[Sightseeingway] Debug: File Created: {filePath}");
+            PrintChatMessage($"Debug: File Created: {filePath}");
 
             if (IsInRenameCache(e.FullPath))
             {
                 Log.Debug($"File '{fileName}' is in rename cache, ignoring.");
-                ChatGui.Print($"[Sightseeingway] Debug: Ignoring cached filename: {filePath}");
+                PrintChatMessage($"Debug: Ignoring cached filename: {filePath}");
                 return;
             }
 
@@ -214,7 +209,7 @@ namespace Sightseeingway
             else
             {
                 Log.Warning($"File not released in time for renaming: {filePath}");
-                ChatGui.Print($"[Sightseeingway] Warning: File not released in time: {filePath}");
+                PrintChatMessage($"Warning: File not released in time: {filePath}");
             }
         }
 
@@ -254,20 +249,20 @@ namespace Sightseeingway
             Log.Debug($"RenameFile started for: {filePath}");
             try
             {
-                var characterName = ClientState.LocalPlayer?.Name.TextValue ?? "";
+                var characterName = ClientState.LocalPlayer?.Name.TextValue.Replace(" ", "") ?? "";
                 var mapName = "";
                 var posPart = "";
                 string presetName = null; // Store the preset name
 
-                // Extract preset name if filename matches the expected format
-                var fileName = Path.GetFileName(filePath);
+                // Extract preset name if filename matches the expected format
+                var fileName = Path.GetFileName(filePath);
                 var pattern = @"^(\d{4}-\d{2}-\d{2}) (\d{2}-\d{2}-\d{2}) (.*?) (.*?)(\..+)$"; // Regex pattern
-                var match = Regex.Match(fileName, pattern);
+                var match = Regex.Match(fileName, pattern);
 
                 if (match.Success)
                 {
                     presetName = match.Groups[3].Value.Trim(); // Extract the preset name
-                    Log.Debug($"Extracted preset name: {presetName}");
+                    Log.Debug($"Extracted preset name: {presetName}");
                 }
 
 
@@ -275,7 +270,7 @@ namespace Sightseeingway
                 if (mapExcelSheet != null && ClientState.MapId > 0)
                 {
                     var mapType = mapExcelSheet.GetRow(ClientState.MapId);
-                    mapName = mapType.PlaceName.Value.Name.ExtractText() ?? "";
+                    mapName = mapType.PlaceName.Value.Name.ExtractText().Replace(" ", "") ?? "";
 
                     Log.Debug($"Map name resolved: {mapName}");
 
@@ -284,7 +279,7 @@ namespace Sightseeingway
 
                     var mapVector = MapUtil.WorldToMap(mapPosition, mapType);
 
-                    posPart = mapPosition == Vector2.Zero ? "" : $" ({mapVector.X:0.0},{mapVector.Y:0.0})";
+                    posPart = mapPosition == Vector2.Zero ? "" : $"({mapVector.X:0.0},{mapVector.Y:0.0})";
                 }
                 else
                 {
@@ -296,7 +291,7 @@ namespace Sightseeingway
 
                 if (!characterName.IsNullOrEmpty()) characterName = "-" + characterName;
                 if (!mapName.IsNullOrEmpty()) mapName = "-" + mapName;
-                if (!presetName.IsNullOrEmpty()) presetName = "-" + presetName;
+                if (!presetName.IsNullOrEmpty()) presetName = "-" + presetName.Replace(" ", "");
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
                 var newFilename = $"{timestamp}{characterName}{mapName}{posPart}{presetName}{extension}";
@@ -311,7 +306,7 @@ namespace Sightseeingway
                 AddToRenameCache(newFilename);
 
                 Log.Information($"Renamed file to: {newFilePath}");
-                ChatGui.Print($"[Sightseeingway] Renamed: {newFilename}");
+                ChatGui.Print($"[Sightseeingway] Screenshot renamed: {newFilename}");
             }
             catch (Exception ex)
             {
@@ -357,6 +352,14 @@ namespace Sightseeingway
                     renamedFilesCache.Remove(key);
                     Log.Debug($"Expired filename '{key}' removed from cache.");
                 }
+            }
+        }
+
+        private void PrintChatMessage(string message)
+        {
+            if (DEBUG)
+            {
+                ChatGui.Print($"[Sightseeingway] Debug: {message}");
             }
         }
     }
