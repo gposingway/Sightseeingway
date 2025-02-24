@@ -11,6 +11,7 @@ using System.Diagnostics;
 using System.Linq;
 using System.Text.RegularExpressions;
 using Dalamud.Utility;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
 
 namespace Sightseeingway
 {
@@ -27,19 +28,16 @@ namespace Sightseeingway
 
         private readonly List<FileSystemWatcher> watchers = [];
         private readonly List<string> foldersToMonitor = [];
+        private readonly List<string> iniFilesToCheck = ["ReShade.ini", "GShade.ini"];
 
         private readonly Dictionary<string, DateTime> renamedFilesCache = [];
         private readonly TimeSpan cacheDuration = TimeSpan.FromMinutes(1);
 
-        public Configuration Configuration { get; init; }
-
         // Static debug flag
         public static bool DEBUG = false;
 
-        public Plugin()
+        public Plugin()
         {
-            Configuration = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-
             Log.Debug("Plugin constructor started.");
             PrintChatMessage("Plugin Initializing...");
 
@@ -56,7 +54,7 @@ namespace Sightseeingway
         {
             try
             {
-                Process currentProcess = Process.GetCurrentProcess();
+                var currentProcess = Process.GetCurrentProcess();
                 return currentProcess.MainModule?.FileName != null ? Path.GetDirectoryName(currentProcess.MainModule.FileName) : ".";
             }
             catch (Exception ex)
@@ -67,23 +65,222 @@ namespace Sightseeingway
             }
         }
 
+        private string? GetDefaultScreenshotFolder()
+        {
+            Log.Debug("GetDefaultScreenshotFolder started.");
+            // Try to get screenshot path from ffxiv.cfg
+            var screenshotPathFromConfig = GetScreenshotFolderFromConfig();
+            if (!string.IsNullOrEmpty(screenshotPathFromConfig))
+            {
+                Log.Debug($"Screenshot path from ffxiv.cfg: {screenshotPathFromConfig}");
+                return screenshotPathFromConfig;
+            }
+
+            // Fallback to MyDocuments if not found in config
+            try
+            {
+                string myDocuments = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                if (string.IsNullOrEmpty(myDocuments))
+                {
+                    Log.Warning("My Documents folder path is empty.");
+                    return null;
+                }
+
+                var defaultFolder = Path.Combine(myDocuments, "My Games", "Final Fantasy XIV - A Realm Reborn", "screenshots");
+                Log.Debug($"Default screenshot folder (MyDocuments fallback): {defaultFolder}");
+                return defaultFolder;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Error getting default screenshot folder (MyDocuments fallback): {ex}");
+                ChatGui.PrintError($"[Sightseeingway] Error getting default screenshot folder (MyDocuments fallback): {ex.Message}");
+                return null;
+            }
+            finally
+            {
+                Log.Debug("GetDefaultScreenshotFolder finished.");
+            }
+        }
+        private unsafe string? GetScreenshotFolderFromConfig()
+        {
+            var CSFrameworkInstance = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
+
+            Log.Debug("GetScreenshotFolderFromConfig started.");
+            try
+            {
+                var gameConfigPath = CSFrameworkInstance->UserPathString.ToString(); // General game config folder
+                var ffxivCfgFile = CSFrameworkInstance->ConfigPath.ToString(); // Direct path to ffxiv.cfg
+
+                if (string.IsNullOrEmpty(ffxivCfgFile) || !File.Exists(ffxivCfgFile))
+                {
+                    Log.Warning($"ffxiv.cfg file not found at: {ffxivCfgFile}");
+                    return null;
+                }
+
+                Log.Debug($"Config path: {gameConfigPath}, ffxiv.cfg path: {ffxivCfgFile}");
+
+                var lines = File.ReadAllLines(ffxivCfgFile);
+                string? configScreenshotDir = null;
+
+                foreach (var line in lines)
+                {
+                    if (line.Trim().StartsWith("ScreenShotDir"))
+                    {
+                        configScreenshotDir = line.Split('\t').LastOrDefault()?.Trim().Trim('"');
+                        if (!string.IsNullOrEmpty(configScreenshotDir)) break; // Found the screenshot directory.
+                    }
+                }
+
+                if (string.IsNullOrEmpty(configScreenshotDir))
+                {
+                    Log.Debug("ScreenShotDir not found in ffxiv.cfg.");
+                    return null; // Not found
+                }
+
+                var resolvedPath = configScreenshotDir.Trim();
+                if (!Path.IsPathRooted(configScreenshotDir))
+                {
+                    resolvedPath = Path.GetFullPath(Path.Combine(gameConfigPath, configScreenshotDir));
+                    Log.Debug($"ScreenshotDir is relative, resolved to: {resolvedPath}");
+                }
+
+                PrintChatMessage($"ffxiv.cfg Screenshot path: {resolvedPath}");
+                if (Directory.Exists(resolvedPath)) return resolvedPath;
+
+                var standardDocumentsPath = Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments);
+                var oneDriveDocumentsPath = GetOneDriveDocumentPath() ?? GetOneDriveDocumentPathFromRegistry();
+
+                var laststandardDocumentsPart = Path.GetFileName(standardDocumentsPath);
+                var lastOneDriveDocumentsPart = Path.GetFileName(oneDriveDocumentsPath);
+
+                if (resolvedPath.Contains(lastOneDriveDocumentsPart))
+                {
+                    // replace the start of resolvedPath up to lastOneDriveDocumentsPart with the equivalent part of standardDocumentsPath
+                    resolvedPath = resolvedPath.Replace(resolvedPath.Substring(0, resolvedPath.IndexOf(lastOneDriveDocumentsPart) + lastOneDriveDocumentsPart.Length), standardDocumentsPath);
+                }
+
+                Log.Debug($"Screenshot path from ffxiv.cfg (potentially corrected): {resolvedPath}");
+                PrintChatMessage($"ffxiv.cfg Screenshot path exists? {Directory.Exists(resolvedPath)}");
+
+                return resolvedPath;
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Error reading ffxiv.cfg: {ex}");
+                ChatGui.PrintError($"[Sightseeingway] Error reading ffxiv.cfg: {ex}");
+                return null;
+            }
+            finally
+            {
+                Log.Debug("GetScreenshotFolderFromConfig finished.");
+            }
+        }
+
+        // I hate you, OneDrive.
+        private string? GetOneDriveDocumentPath()
+        {
+            string? oneDrivePath = Environment.GetEnvironmentVariable("OneDriveConsumer"); // Personal OneDrive
+            if (string.IsNullOrEmpty(oneDrivePath))
+            {
+                oneDrivePath = Environment.GetEnvironmentVariable("OneDrive"); // OneDrive for Business or Personal
+            }
+            if (string.IsNullOrEmpty(oneDrivePath))
+            {
+                oneDrivePath = Environment.GetEnvironmentVariable("OneDriveCommercial"); // OneDrive for Business
+            }
+
+            if (!string.IsNullOrEmpty(oneDrivePath))
+            {
+                string documentsPath = Path.Combine(oneDrivePath, "Documents");
+                if (Directory.Exists(documentsPath))
+                {
+                    Log.Debug($"OneDrive Documents path found via environment variable: {documentsPath}");
+                    return documentsPath;
+                }
+                else
+                {
+                    Log.Debug($"OneDrive Documents path from env var does not exist: {documentsPath}");
+                }
+            }
+            return null;
+        }
+
+        private string? GetOneDriveDocumentPathFromRegistry()
+        {
+            try
+            {
+                using (var key = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Software\Microsoft\OneDrive"))
+                {
+                    if (key != null)
+                    {
+                        var oneDrivePath = key.GetValue("UserFolder") as string;
+                        if (!string.IsNullOrEmpty(oneDrivePath))
+                        {
+                            string documentsPath = Path.Combine(oneDrivePath, "Documents");
+                            if (Directory.Exists(documentsPath))
+                            {
+                                Log.Debug($"OneDrive Documents path found via registry: {documentsPath}");
+                                return documentsPath;
+                            }
+                            else
+                            {
+                                Log.Debug($"OneDrive Documents path from registry does not exist: {documentsPath}");
+                            }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Log.Error($"Error reading OneDrive path from registry: {ex}");
+                ChatGui.PrintError($"[Sightseeingway] Error reading OneDrive path from registry: {ex.Message}");
+            }
+            return null;
+        }
+
         private void InitializeFoldersToMonitor()
         {
             Log.Debug("InitializeFoldersToMonitor started.");
-            var defaultScreenshotFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.MyDocuments), "My Games", "Final Fantasy XIV - A Realm Reborn", "screenshots");
-            foldersToMonitor.Add(defaultScreenshotFolder);
-            Log.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
+            var defaultScreenshotFolder = GetDefaultScreenshotFolder();
+
+            if (defaultScreenshotFolder != null)
+            {
+                foldersToMonitor.Add(defaultScreenshotFolder);
+                Log.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
+            }
 
             var gameBaseDir = GetGameDirectory();
-            var reshadeIniPath = Path.Combine(gameBaseDir, "reshade.ini");
-            Log.Debug($"Checking for reshade.ini at: {reshadeIniPath}");
 
-            if (File.Exists(reshadeIniPath))
+            var dxgiPath = Path.Combine(gameBaseDir, "dxgi.dll");
+
+            if (File.Exists(dxgiPath))
             {
-                Log.Debug($"reshade.ini found in game folder.");
+                Log.Debug($"dxgi.dll found, checking for INI files.");
+                foreach (var iniFileName in iniFilesToCheck)
+                {
+                    ProcessIniFile(gameBaseDir, iniFileName);
+                }
+            }
+            else
+            {
+                Log.Debug($"dxgi.dll not found in game folder, skipping INI file checks.");
+                PrintChatMessage($"Debug: dxgi.dll not found, skipping INI file checks.");
+            }
+
+            Log.Debug("InitializeFoldersToMonitor finished.");
+        }
+
+        private void ProcessIniFile(string gameBaseDir, string iniFileName)
+        {
+            var iniFilePath = Path.Combine(gameBaseDir, iniFileName);
+            Log.Debug($"Checking for {iniFileName} at: {iniFilePath}");
+
+            if (File.Exists(iniFilePath))
+            {
+                Log.Debug($"{iniFileName} found in game folder.");
                 try
                 {
-                    var lines = File.ReadAllLines(reshadeIniPath);
+                    var lines = File.ReadAllLines(iniFilePath);
                     string? savePath = null;
                     var inScreenshotGroup = false;
 
@@ -93,12 +290,12 @@ namespace Sightseeingway
                         if (trimmedLine == "[SCREENSHOT]")
                         {
                             inScreenshotGroup = true;
-                            Log.Debug("Found [SCREENSHOT] group in reshade.ini");
+                            Log.Debug($"Found [SCREENSHOT] group in {iniFileName}");
                         }
                         else if (inScreenshotGroup && trimmedLine.StartsWith("SavePath="))
                         {
                             savePath = trimmedLine.Substring("SavePath=".Length).Trim().Trim('"');
-                            Log.Debug($"Reshade SavePath found in ini: {savePath}");
+                            Log.Debug($"{iniFileName} SavePath found in ini: {savePath}");
                             break;
                         }
                         else if (trimmedLine.StartsWith("["))
@@ -113,39 +310,37 @@ namespace Sightseeingway
                         if (!Path.IsPathRooted(savePath))
                         {
                             resolvedSavePath = Path.GetFullPath(Path.Combine(gameBaseDir, savePath));
-                            Log.Debug($"Reshade SavePath is relative, resolving to absolute path: {resolvedSavePath}");
+                            Log.Debug($"{iniFileName} SavePath is relative, resolving to absolute path: {resolvedSavePath}");
                         }
 
                         if (!foldersToMonitor.Contains(resolvedSavePath) && System.IO.Directory.Exists(resolvedSavePath))
                         {
                             foldersToMonitor.Add(resolvedSavePath);
-                            Log.Debug($"Reshade SavePath folder added: {resolvedSavePath}");
-                            PrintChatMessage($"Debug: Reshade SavePath folder added: {resolvedSavePath}");
+                            Log.Debug($"{iniFileName} SavePath folder added: {resolvedSavePath}");
+                            PrintChatMessage($"Debug: {iniFileName} SavePath folder added: {resolvedSavePath}");
                         }
                         else
                         {
-                            Log.Debug($"Reshade SavePath folder already monitored or does not exist: {resolvedSavePath}");
+                            Log.Debug($"{iniFileName} SavePath folder already monitored or does not exist: {resolvedSavePath}");
                         }
                     }
                     else
                     {
-                        Log.Debug("Reshade SavePath not found in ini.");
+                        Log.Debug($"{iniFileName} SavePath not found in ini.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"Error reading reshade.ini: {ex}");
-                    ChatGui.PrintError($"[Sightseeingway] Error reading reshade.ini: {ex}");
+                    Log.Error($"Error reading {iniFileName}: {ex}");
+                    ChatGui.PrintError($"[Sightseeingway] Error reading {iniFileName}: {ex}");
                 }
             }
             else
             {
-                Log.Debug($"reshade.ini not found in game folder: {reshadeIniPath}");
-                PrintChatMessage($"Debug: reshade.ini not found in game folder: {reshadeIniPath}");
+                Log.Debug($"{iniFileName} not found in game folder: {iniFilePath}");
+                PrintChatMessage($"Debug: {iniFileName} not found in game folder: {iniFilePath}");
             }
-            Log.Debug("InitializeFoldersToMonitor finished.");
         }
-
         private void InitializeWatchers()
         {
             Log.Debug("InitializeWatchers started.");
@@ -252,19 +447,6 @@ namespace Sightseeingway
                 var characterName = ClientState.LocalPlayer?.Name.TextValue.Replace(" ", "") ?? "";
                 var mapName = "";
                 var posPart = "";
-                string presetName = null; // Store the preset name
-
-                // Extract preset name if filename matches the expected format
-                var fileName = Path.GetFileName(filePath);
-                var pattern = @"^(\d{4}-\d{2}-\d{2}) (\d{2}-\d{2}-\d{2}) (.*?) (.*?)(\..+)$"; // Regex pattern
-                var match = Regex.Match(fileName, pattern);
-
-                if (match.Success)
-                {
-                    presetName = match.Groups[3].Value.Trim(); // Extract the preset name
-                    Log.Debug($"Extracted preset name: {presetName}");
-                }
-
 
                 var mapExcelSheet = DataManager.GetExcelSheet<Map>();
                 if (mapExcelSheet != null && ClientState.MapId > 0)
@@ -288,13 +470,14 @@ namespace Sightseeingway
 
                 var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
 
+                // We should have all parts at this point. Let's build the new filename.
 
                 if (!characterName.IsNullOrEmpty()) characterName = "-" + characterName;
                 if (!mapName.IsNullOrEmpty()) mapName = "-" + mapName;
-                if (!presetName.IsNullOrEmpty()) presetName = "-" + presetName.Replace(" ", "");
+
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-                var newFilename = $"{timestamp}{characterName}{mapName}{posPart}{presetName}{extension}";
+                var newFilename = $"{timestamp}{characterName}{mapName}{posPart}{extension}";
 
                 var directory = Path.GetDirectoryName(filePath);
                 var newFilePath = Path.Combine(directory, newFilename);
@@ -359,7 +542,7 @@ namespace Sightseeingway
         {
             if (DEBUG)
             {
-                ChatGui.Print($"[Sightseeingway] Debug: {message}");
+                ChatGui.Print($"[Sightseeingway]: {message}");
             }
         }
     }
