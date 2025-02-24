@@ -29,22 +29,21 @@ namespace Sightseeingway
         public Plugin()
         {
             Log.Debug("Plugin constructor started.");
-            PrintChatMessage("Plugin Initializing...");
+            Chat("Plugin Initializing...");
 
-            ChatGui.Print($"[Sightseeingway] Ready to help, friend!");
+            Client.Print($"Ready to help, friend!");
 
             InitializeFoldersToMonitor();
-            InitializeWatchers();
+            IO.InitializeWatchers(foldersToMonitor, watchers);
 
             Log.Debug("Plugin constructor finished.");
-            PrintChatMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
+            Chat("Plugin Initialized. Monitoring screenshot folders with filename caching.");
         }
-
 
         private void InitializeFoldersToMonitor()
         {
             Log.Debug("InitializeFoldersToMonitor started.");
-            var defaultScreenshotFolder = GetDefaultScreenshotFolder();
+            var defaultScreenshotFolder = Environment.GetDefaultScreenshotFolder();
 
             if (defaultScreenshotFolder != null)
             {
@@ -52,7 +51,7 @@ namespace Sightseeingway
                 Log.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
             }
 
-            var gameBaseDir = GetGameDirectory();
+            var gameBaseDir = Environment.GetGameDirectory();
 
             var dxgiPath = Path.Combine(gameBaseDir, "dxgi.dll");
 
@@ -67,7 +66,7 @@ namespace Sightseeingway
             else
             {
                 Log.Debug($"dxgi.dll not found in game folder, skipping INI file checks.");
-                PrintChatMessage($"Debug: dxgi.dll not found, skipping INI file checks.");
+                Chat($"Debug: dxgi.dll not found, skipping INI file checks.");
             }
 
             Log.Debug("InitializeFoldersToMonitor finished.");
@@ -120,7 +119,7 @@ namespace Sightseeingway
                         {
                             foldersToMonitor.Add(resolvedSavePath);
                             Log.Debug($"{iniFileName} SavePath folder added: {resolvedSavePath}");
-                            PrintChatMessage($"Debug: {iniFileName} SavePath folder added: {resolvedSavePath}");
+                            Chat($"Debug: {iniFileName} SavePath folder added: {resolvedSavePath}");
                         }
                         else
                         {
@@ -141,37 +140,15 @@ namespace Sightseeingway
             else
             {
                 Log.Debug($"{iniFileName} not found in game folder: {iniFilePath}");
-                PrintChatMessage($"Debug: {iniFileName} not found in game folder: {iniFilePath}");
+                Chat($"Debug: {iniFileName} not found in game folder: {iniFilePath}");
             }
         }
-        private void InitializeWatchers()
-        {
-            Log.Debug("InitializeWatchers started.");
-            foreach (string folder in foldersToMonitor)
-            {
-                if (System.IO.Directory.Exists(folder))
-                {
-                    Log.Debug($"Creating watcher for folder: {folder}");
-                    var watcher = new FileSystemWatcher(folder);
-                    watcher.Created += IO.OnFileCreated;
-                    watcher.EnableRaisingEvents = true;
-                    watchers.Add(watcher);
-                    Log.Information($"Monitoring folder: {folder}");
-                    PrintChatMessage($"Monitoring folder: {folder}");
-                }
-                else
-                {
-                    Log.Error($"Folder not found: {folder}");
-                    ChatGui.PrintError($"[Sightseeingway] Error: Folder not found: {folder}");
-                }
-            }
-            Log.Debug("InitializeWatchers finished.");
-        }
+   
 
         public void Dispose()
         {
             Log.Debug("Dispose started.");
-            PrintChatMessage("Plugin Disposing...");
+            Chat("Plugin Disposing...");
 
             foreach (var watcher in watchers)
             {
@@ -183,14 +160,14 @@ namespace Sightseeingway
             watchers.Clear();
             Log.Debug("Watcher list cleared.");
             Log.Debug("Dispose finished.");
-            PrintChatMessage("Plugin Disposed.");
+            Chat("Plugin Disposed.");
         }
 
-        public static void PrintChatMessage(string message)
+        public static void Chat(string message)
         {
             if (DEBUG)
             {
-                ChatGui.Print($"[Sightseeingway]: {message}");
+                Client.Print(message);
             }
         }
     }

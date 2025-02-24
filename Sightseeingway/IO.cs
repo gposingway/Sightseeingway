@@ -23,7 +23,7 @@ namespace Sightseeingway
                     watcher.EnableRaisingEvents = true;
                     watchers.Add(watcher);
                     Plugin.Log.Information($"Monitoring folder: {folder}");
-                    Plugin.ChatGui.Print($"Monitoring folder: {folder}");
+                    Plugin.Chat($"Monitoring folder: {folder}");
                 }
                 else
                 {
@@ -40,12 +40,12 @@ namespace Sightseeingway
             var filePath = e.FullPath;
             var fileName = e.Name;
             Plugin.Log.Debug($"File Created event triggered for: {filePath}");
-            Plugin.PrintChatMessage($"Debug: File Created: {filePath}");
+            Plugin.Chat($"Debug: File Created: {filePath}");
 
             if (Caching.IsInRenameCache(e.FullPath))
             {
                 Plugin.Log.Debug($"File '{fileName}' is in rename cache, ignoring.");
-                Plugin.PrintChatMessage($"Debug: Ignoring cached filename: {filePath}");
+                Plugin.Chat($"Debug: Ignoring cached filename: {filePath}");
                 return;
             }
 
@@ -56,7 +56,7 @@ namespace Sightseeingway
             else
             {
                 Plugin.Log.Warning($"File not released in time for renaming: {filePath}");
-                Plugin.PrintChatMessage($"Warning: File not released in time: {filePath}");
+                Plugin.Chat($"Warning: File not released in time: {filePath}");
             }
         }
 
@@ -141,7 +141,8 @@ namespace Sightseeingway
                 File.Move(filePath, newFilePath);
 
                 Plugin.Log.Information($"Renamed file to: {newFilePath}");
-                Plugin.ChatGui.Print($"[Sightseeingway] Screenshot renamed: {newFilename}");
+
+                Client.Print($"Screenshot renamed: {newFilename}");
             }
             catch (Exception ex)
             {

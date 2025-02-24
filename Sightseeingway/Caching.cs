@@ -9,7 +9,7 @@ namespace Sightseeingway
         private static readonly Dictionary<string, DateTime> RenamedFilesCache = [];
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
 
-        private static void AddToRenameCache(string filename)
+        public static void AddToRenameCache(string filename)
         {
             if (RenamedFilesCache.ContainsKey(filename))
             {
@@ -24,7 +24,7 @@ namespace Sightseeingway
             CleanRenameCache();
         }
 
-        private static bool IsInRenameCache(string filename)
+        public static bool IsInRenameCache(string filename)
         {
             if (RenamedFilesCache.ContainsKey(filename))
             {
