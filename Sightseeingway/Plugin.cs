@@ -9,9 +9,8 @@ using System.Threading;
 using Lumina.Excel.Sheets;
 using System.Diagnostics;
 using System.Linq;
-using FFXIVClientStructs.FFXIV.Client.UI.Agent;
-using Lumina.Data.Parsing.Layer;
 using System.Text.RegularExpressions;
+using Dalamud.Utility;
 
 namespace Sightseeingway
 {
@@ -25,7 +24,6 @@ namespace Sightseeingway
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
 
-        private const string CommandName = "/sightseeingway";
         private readonly List<FileSystemWatcher> watchers = [];
         private readonly List<string> foldersToMonitor = [];
 
@@ -238,15 +236,15 @@ namespace Sightseeingway
             Log.Debug($"RenameFile started for: {filePath}");
             try
             {
-                var characterName = ClientState.LocalPlayer?.Name.TextValue ?? "nochar";
-                var mapName = "nowhere";
+                var characterName = ClientState.LocalPlayer?.Name.TextValue ?? "";
+                var mapName = "";
                 var posPart = "";
                 string presetName = null; // Store the preset name
 
                 // Extract preset name if filename matches the expected format
-                string fileName = Path.GetFileName(filePath);
-                string pattern = @"^(\d{4}-\d{2}-\d{2}) (\d{2}-\d{2}-\d{2}) (.*?) (.*?)(\..+)$"; // Regex pattern
-                Match match = Regex.Match(fileName, pattern);
+                var fileName = Path.GetFileName(filePath);
+                var pattern = @"^(\d{4}-\d{2}-\d{2}) (\d{2}-\d{2}-\d{2}) (.*?) (.*?)(\..+)$"; // Regex pattern
+                var match = Regex.Match(fileName, pattern);
 
                 if (match.Success)
                 {
@@ -259,14 +257,14 @@ namespace Sightseeingway
                 if (mapExcelSheet != null && ClientState.MapId > 0)
                 {
                     var mapType = mapExcelSheet.GetRow(ClientState.MapId);
-                    mapName = mapType.PlaceName.Value.Name.ExtractText() ?? "nowhere";
+                    mapName = mapType.PlaceName.Value.Name.ExtractText() ?? "";
 
                     Log.Debug($"Map name resolved: {mapName}");
 
                     var position = ClientState.LocalPlayer?.Position ?? Vector3.Zero;
                     var mapPosition = new Vector2(position.X, position.Y);
 
-                    var mapVector = Dalamud.Utility.MapUtil.WorldToMap(mapPosition, mapType);
+                    var mapVector = MapUtil.WorldToMap(mapPosition, mapType);
 
                     posPart = mapPosition == Vector2.Zero ? "" : $" ({mapVector.X:0.0},{mapVector.Y:0.0})";
                 }
@@ -278,14 +276,13 @@ namespace Sightseeingway
                 var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
                 var newFilename = $"{timestamp}_{characterName}_{mapName}{posPart}";
 
-                if (presetName != null)
-                {
-                    newFilename = $"{timestamp}_{characterName}_{mapName}{posPart} {presetName}{Path.GetExtension(filePath).ToLowerInvariant()}";
-                }
-                else
-                {
-                    newFilename = $"{timestamp}_{characterName}_{mapName}{posPart}{Path.GetExtension(filePath).ToLowerInvariant()}";
-                }
+
+                if (!characterName.IsNullOrEmpty()) characterName = "-" + characterName;
+                if (!mapName.IsNullOrEmpty()) mapName = "-" + mapName;
+                if (!presetName.IsNullOrEmpty()) presetName = "-" + presetName;
+                var extension = Path.GetExtension(filePath).ToLowerInvariant();
+
+                    newFilename = $"{timestamp}{characterName}{mapName}{posPart}{presetName}{extension}";
 
 
                 var directory = Path.GetDirectoryName(filePath);
