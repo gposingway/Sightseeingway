@@ -468,7 +468,8 @@ namespace Sightseeingway
                     Log.Warning("Map sheet not found or MapId is 0.");
                 }
 
-                var timestamp = DateTime.Now.ToString("yyyyMMddHHmmss");
+                var fileCreationTime = File.GetCreationTime(filePath);
+                var timestamp = fileCreationTime.ToString("yyyyMMddHHmmss") + fileCreationTime.Millisecond.ToString("D3");
 
                 // We should have all parts at this point. Let's build the new filename.
 
