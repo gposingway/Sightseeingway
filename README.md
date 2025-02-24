@@ -36,20 +36,19 @@ No more generic screenshot names like `ffxiv_001.png`\!  Sightseeingway helps yo
 
 Sightseeingway works automatically in the background\!  Simply take screenshots as you normally would in FFXIV.  When you save a screenshot, Sightseeingway will automatically rename it with the following format:
 
-`[Timestamp]_[CharacterName]_[MapName]_[X-Coordinate][Y-Coordinate][Z-Coordinate].png`
+`[Timestamp][CharacterName][MapName]([X-Coordinate],[Y-Coordinate]).png`
 
-*   **Timestamp:**  `YYYYMMDDHHMMSSmilliseconds` (e.g., `20250222135356123` for February 22, 2025, 1:53:56 PM and 123 milliseconds). Timestamps are in your local time.
-*   **CharacterName:** Your character's name.
-*   **MapName:** The name of the in-game map (e.g., "The Waking Sands").
+*   **Timestamp:**  `YYYYMMDDHHMMSSmil` (e.g., `20250222135356123` for February 22, 2025, 1:53:56 PM, 123 ms). Timestamps are in your local time.
+*   **CharacterName:** Your character's name, no spaces (e.g., "MyCharacter").
+*   **MapName:** The name of the in-game map (e.g., "TheWakingSands").
 *   **X-Coordinate:**  The X coordinate on the map.
 *   **Y-Coordinate:**  The Y coordinate on the map.
-*   **Z-Coordinate:**  The Z coordinate on the map (if available).
 
 **Example:**
 
-`20250222135356123_MyCharacter_TheWakingSands_X12Y34Z56.png`
+`20250223232708-MyCharacter-TheRoost(3.5,3.6).png`
 
-This screenshot was taken on February 22, 2025, at 1:53:56 PM and 123 milliseconds (local time), by the character "MyCharacter" in "The Waking Sands" at coordinates X:12, Y:34, and Z:56.
+This screenshot was taken on February 22, 2025, at 1:53:56 PM and 123 milliseconds (local time), by the character "My Character" in "The Roost" at coordinates X:3.5, Y:3.6.
 
 ## Planned Features (Future Development)
 
