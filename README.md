@@ -10,7 +10,7 @@ Take Sightseeingway with you\! This Dalamud addon for FFXIV automatically names 
 
   * **Character Name:**  Know exactly which character took the screenshot.
   * **Map Name:**  Quickly identify the in-game zone where the screenshot was taken.
-  * **Coordinates (X, Y, Z):** Pinpoint the exact location on the map, including altitude if available.
+  * **Coordinates (X, Y):** Pinpoint the exact location on the map.
 
 This addon is perfect for:
 
