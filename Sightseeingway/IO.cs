@@ -40,6 +40,14 @@ namespace Sightseeingway
         {
             var filePath = e.FullPath;
             var fileName = e.Name;
+            var extension = Path.GetExtension(filePath).ToLowerInvariant();
+
+            if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
+            {
+                Plugin.Log.Debug($"File '{fileName}' is not a supported image type, ignoring.");
+                return;
+            }
+
             Plugin.Log.Debug($"File Created event triggered for: {filePath}");
             Plugin.Chat($"Debug: File Created: {filePath}");
 
@@ -60,8 +68,6 @@ namespace Sightseeingway
                 Plugin.Chat($"Warning: File not released in time: {filePath}");
             }
         }
-
-
 
         public static bool WaitForFileRelease(string filePath)
         {
