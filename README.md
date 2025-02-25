@@ -38,10 +38,10 @@ No more generic screenshot names like `ffxiv_001.png`!  Sightseeingway helps you
 
 Sightseeingway works automatically in the background! Simply take screenshots as you normally would in FFXIV.  When you save a screenshot, Sightseeingway will automatically rename it with the following format:
 
-`[Timestamp][Character][Map][Position][EorzeaTime][Weather][Extension]`
+### `[Timestamp][Character][Map][Position][EorzeaTime][Weather][Extension]`
 
 *   **Timestamp:**  `YYYYMMDDHHMMSSmil` (e.g., `20250222135356123` for February 22, 2025, 1:53:56 PM, 123 ms). Timestamps are in your local time.
-*   **Character:** Your character's name, no spaces (e.g., "MyCharacter").
+*   **Character:** Your character's name, if available (e.g., "My Character").
 *   **Map:** The name of the in-game map (e.g., "The Waking Sands").
 *   **Position:**  The coordinates on the map in the format `([X-Coordinate],[Y-Coordinate])` (e.g., "(3.5,3.6)").
 *   **EorzeaTime:** The in-game time of day when the screenshot was taken. Abbreviations are used:
