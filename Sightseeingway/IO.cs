@@ -35,7 +35,6 @@ namespace Sightseeingway
             Plugin.Log.Debug("InitializeWatchers finished.");
         }
 
-
         public static void OnFileCreated(object sender, FileSystemEventArgs e)
         {
             var filePath = e.FullPath;
