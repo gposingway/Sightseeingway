@@ -5,6 +5,7 @@ using System.Threading;
 using Lumina.Excel.Sheets;
 using Dalamud.Utility;
 using System.Collections.Generic;
+using FFXIVClientStructs.FFXIV.Client.System.Framework;
 
 namespace Sightseeingway
 {
@@ -35,7 +36,7 @@ namespace Sightseeingway
         }
 
 
-        public static  void OnFileCreated(object sender, FileSystemEventArgs e)
+        public static void OnFileCreated(object sender, FileSystemEventArgs e)
         {
             var filePath = e.FullPath;
             var fileName = e.Name;
@@ -60,7 +61,9 @@ namespace Sightseeingway
             }
         }
 
-        public static  bool WaitForFileRelease(string filePath)
+
+
+        public static bool WaitForFileRelease(string filePath)
         {
             Plugin.Log.Debug($"WaitForFileRelease started for: {filePath}");
             var maxTries = 10;
@@ -91,29 +94,29 @@ namespace Sightseeingway
             return false;
         }
 
-        public static  void RenameFile(string filePath)
+        public static void RenameFile(string filePath)
         {
             Plugin.Log.Debug($"RenameFile started for: {filePath}");
             try
             {
-                var characterName = Plugin.ClientState.LocalPlayer?.Name.TextValue.Replace(" ", "") ?? "";
-                var mapName = "";
-                var posPart = "";
+                var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
+                var map = "";
+                var position = "";
 
                 var mapExcelSheet = Plugin.DataManager.GetExcelSheet<Map>();
                 if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
                 {
                     var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
-                    mapName = mapType.PlaceName.Value.Name.ExtractText().Replace(" ", "") ?? "";
+                    map = mapType.PlaceName.Value.Name.ExtractText() ?? "";
 
-                    Plugin.Log.Debug($"Map name resolved: {mapName}");
+                    Plugin.Log.Debug($"Map name resolved: {map}");
 
-                    var position = Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero;
-                    var mapPosition = new Vector2(position.X, position.Y);
+                    var worldPosition = Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero;
+                    var mapPosition = new Vector2(worldPosition.X, worldPosition.Y);
 
                     var mapVector = MapUtil.WorldToMap(mapPosition, mapType);
 
-                    posPart = mapPosition == Vector2.Zero ? "" : $"({mapVector.X:0.0},{mapVector.Y:0.0})";
+                    position = mapPosition == Vector2.Zero ? "" : $" ({mapVector.X:0.0},{mapVector.Y:0.0})";
                 }
                 else
                 {
@@ -123,14 +126,20 @@ namespace Sightseeingway
                 var fileCreationTime = File.GetCreationTime(filePath);
                 var timestamp = fileCreationTime.ToString("yyyyMMddHHmmss") + fileCreationTime.Millisecond.ToString("D3");
 
+                // Get in-game Eorzea time
+                var eorzeaTime = DateTime.Now.ToEorzeaTime().GetDayPeriodWithGoldenHour(true);
+                var weather = Client.GetCurrentWeather();
+
                 // We should have all parts at this point. Let's build the new filename.
 
-                if (!characterName.IsNullOrEmpty()) characterName = "-" + characterName;
-                if (!mapName.IsNullOrEmpty()) mapName = "-" + mapName;
+                character = PrepareNamePart(character);
+                map = PrepareNamePart(map);
+                weather = PrepareNamePart(weather);
+                eorzeaTime = PrepareNamePart(eorzeaTime);
 
                 var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-                var newFilename = $"{timestamp}{characterName}{mapName}{posPart}{extension}";
+                var newFilename = $"{timestamp}{character}{map}{position}{eorzeaTime}{weather}{extension}";
 
                 var directory = Path.GetDirectoryName(filePath);
                 var newFilePath = Path.Combine(directory, newFilename);
@@ -151,6 +160,12 @@ namespace Sightseeingway
             }
             Plugin.Log.Debug($"RenameFile finished for: {filePath}");
         }
+
+        public static string PrepareNamePart(string part) { 
+            if (part.IsNullOrEmpty()) return "";
+            return "-" + part;
+        }
+
 
     }
 }

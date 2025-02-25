@@ -1,6 +1,8 @@
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
+using FFXIVClientStructs.FFXIV.Client.Game;
+using Lumina.Excel.Sheets;
 using System.Collections.Generic;
 
 namespace Sightseeingway
@@ -34,6 +36,16 @@ namespace Sightseeingway
             builder.Append(payloads);
 
             return builder.BuiltString;
+        }
+
+        public unsafe static string GetCurrentWeather()
+        {
+            var weatherId = WeatherManager.Instance()->GetCurrentWeather();
+            var weatherSheet = Plugin.DataManager.GetExcelSheet<Weather>();
+
+            var weatherName = weatherSheet.GetRow(weatherId).Name.ExtractText();
+
+            return weatherName;
         }
     }
 }

@@ -58,6 +58,7 @@ namespace Sightseeingway
                 Plugin.Log.Debug("GetDefaultScreenshotFolder finished.");
             }
         }
+
         public static unsafe string? GetScreenshotFolderFromConfig()
         {
             var CSFrameworkInstance = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
