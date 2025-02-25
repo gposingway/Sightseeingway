@@ -42,11 +42,7 @@ namespace Sightseeingway
             var fileName = e.Name;
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-            if (extension != ".jpg" && extension != ".jpeg" && extension != ".png")
-            {
-                Plugin.Log.Debug($"File '{fileName}' is not a supported image type, ignoring.");
-                return;
-            }
+            if (extension != ".jpg" && extension != ".jpeg" && extension != ".png") return;
 
             Plugin.Log.Debug($"File Created event triggered for: {filePath}");
             Plugin.Chat($"Debug: File Created: {filePath}");
@@ -167,7 +163,8 @@ namespace Sightseeingway
             Plugin.Log.Debug($"RenameFile finished for: {filePath}");
         }
 
-        public static string PrepareNamePart(string part) { 
+        public static string PrepareNamePart(string part)
+        {
             if (part.IsNullOrEmpty()) return "";
             return "-" + part;
         }
