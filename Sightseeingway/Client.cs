@@ -3,7 +3,9 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Game.Text.SeStringHandling.Payloads;
 using FFXIVClientStructs.FFXIV.Client.Game;
 using Lumina.Excel.Sheets;
+using System;
 using System.Collections.Generic;
+using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Sightseeingway
 {
@@ -38,7 +40,7 @@ namespace Sightseeingway
             return builder.BuiltString;
         }
 
-        public unsafe static string GetCurrentWeather()
+        public static unsafe string GetCurrentWeather()
         {
             var weatherId = WeatherManager.Instance()->GetCurrentWeather();
             var weatherSheet = Plugin.DataManager.GetExcelSheet<Weather>();
@@ -46,6 +48,12 @@ namespace Sightseeingway
             var weatherName = weatherSheet.GetRow(weatherId).Name.ExtractText();
 
             return weatherName;
+        }
+
+        public static unsafe DateTime GetCurrentEorzeaTime()
+        {
+            var eorzeaTime = DateTimeOffset.FromUnixTimeSeconds(FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance()->ClientTime.EorzeaTime);
+            return eorzeaTime.DateTime;
         }
     }
 }

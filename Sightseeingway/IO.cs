@@ -128,7 +128,7 @@ namespace Sightseeingway
                 var timestamp = fileCreationTime.ToString("yyyyMMddHHmmss") + fileCreationTime.Millisecond.ToString("D3");
 
                 // Get in-game Eorzea time
-                var eorzeaTime = DateTime.Now.ToEorzeaTime().GetDayPeriodWithGoldenHour(true);
+                var eorzeaTime = Client.GetCurrentEorzeaTime().GetDayPeriodWithGoldenHour(true);
                 var weather = Client.GetCurrentWeather();
 
                 // We should have all parts at this point. Let's build the new filename.
