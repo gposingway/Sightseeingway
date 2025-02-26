@@ -100,37 +100,50 @@ namespace Sightseeingway
             Plugin.Log.Debug($"RenameFile started for: {filePath}");
             try
             {
-                var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
                 var map = "";
                 var position = "";
-
-                var mapExcelSheet = Plugin.DataManager.GetExcelSheet<Map>();
-                if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
-                {
-                    var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
-                    map = mapType.PlaceName.Value.Name.ExtractText() ?? "";
-
-                    Plugin.Log.Debug($"Map name resolved: {map}");
-
-                    var worldPosition = Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero;
-                    var mapPosition = new Vector2(worldPosition.X, worldPosition.Y);
-
-                    var mapVector = MapUtil.WorldToMap(mapPosition, mapType);
-
-                    position = mapPosition == Vector2.Zero ? "" : $" ({mapVector.X:0.0},{mapVector.Y:0.0})";
-                }
-                else
-                {
-                    Plugin.Log.Warning("Map sheet not found or MapId is 0.");
-                }
+                var eorzeaTime = "";
+                var weather = "";
+                var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
 
                 var fileCreationTime = File.GetCreationTime(filePath);
                 var timestamp = fileCreationTime.ToString("yyyyMMddHHmmss") + fileCreationTime.Millisecond.ToString("D3");
 
-                // Get in-game Eorzea time
-                var eorzeaTime = Client.GetCurrentEorzeaTime().GetDayPeriodWithGoldenHour(true);
-                var weather = Client.GetCurrentWeather();
+                if (character != "")
+                {
+                    var mapExcelSheet = Plugin.DataManager.GetExcelSheet<Map>();
+                    if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
+                    {
+                        var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
+                        map = mapType.PlaceName.Value.Name.ExtractText() ?? "";
 
+                        Plugin.Log.Debug($"Map name resolved: {map}");
+
+                        var mapVector = MapUtil.WorldToMap(Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
+
+                        Vector3 mapPlace = new(
+                            (int)MathF.Round(mapVector.X * 10, 1) / 10f,
+                            (int)MathF.Round(mapVector.Y * 10, 1) / 10f,
+                            (int)MathF.Round(mapVector.Z * 10, 1) / 10f
+                            );
+
+                        position =
+                            mapPlace == Vector3.Zero ? "" :
+                            mapPlace.Z == 0.0 ? $" ({mapPlace.X:0.0},{mapPlace.Y:0.0})" :
+                            $" ({mapPlace.X:0.0},{mapPlace.Y:0.0},{mapPlace.Z:0.0})";
+                    }
+                    else
+                    {
+                        Plugin.Log.Warning("Map sheet not found or MapId is 0.");
+                    }
+
+                    if (map != "")
+                    {
+                        // Get in-game Eorzea time
+                        eorzeaTime = Client.GetCurrentEorzeaTime().GetDayPeriodWithGoldenHour(true);
+                        weather = Client.GetCurrentWeather();
+                    }
+                }
                 // We should have all parts at this point. Let's build the new filename.
 
                 character = PrepareNamePart(character);
