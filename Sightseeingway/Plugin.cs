@@ -18,61 +18,59 @@ namespace Sightseeingway
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
 
-        private readonly List<FileSystemWatcher> watchers = [];
-        private readonly List<string> foldersToMonitor = [];
-        private readonly List<string> iniFilesToCheck = ["ReShade.ini", "GShade.ini"];
-
+        private readonly List<FileSystemWatcher> fileWatchers = new();
+        private readonly List<string> directoriesToMonitor = new();
+        private readonly List<string> iniFilesToCheck = new() { "ReShade.ini", "GShade.ini" };
 
         // Static debug flag
-        public static bool DEBUG = false;
+        public static bool DebugMode = false;
 
         public Plugin()
         {
             Log.Debug("Plugin constructor started.");
-            Chat("Plugin Initializing...");
+            SendMessage("Plugin Initializing...");
 
-            Client.Print($"Ready to help, friend!");
+            Client.PrintMessage("Ready to help, friend!");
 
-            InitializeFoldersToMonitor();
-            IO.InitializeWatchers(foldersToMonitor, watchers);
+            InitializeDirectoriesToMonitor();
+            IO.SetupWatchers(directoriesToMonitor, fileWatchers);
 
             Log.Debug("Plugin constructor finished.");
-            Chat("Plugin Initialized. Monitoring screenshot folders with filename caching.");
+            SendMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
         }
 
-        private void InitializeFoldersToMonitor()
+        private void InitializeDirectoriesToMonitor()
         {
-            Log.Debug("InitializeFoldersToMonitor started.");
+            Log.Debug("InitializeDirectoriesToMonitor started.");
             var defaultScreenshotFolder = Environment.GetDefaultScreenshotFolder();
 
             if (defaultScreenshotFolder != null)
             {
-                foldersToMonitor.Add(defaultScreenshotFolder);
+                directoriesToMonitor.Add(defaultScreenshotFolder);
                 Log.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
             }
 
             var gameBaseDir = Environment.GetGameDirectory();
-
             var dxgiPath = Path.Combine(gameBaseDir, "dxgi.dll");
 
             if (File.Exists(dxgiPath))
             {
-                Log.Debug($"dxgi.dll found, checking for INI files.");
+                Log.Debug("dxgi.dll found, checking for INI files.");
                 foreach (var iniFileName in iniFilesToCheck)
                 {
-                    ProcessIniFile(gameBaseDir, iniFileName);
+                    CheckIniFileForScreenshotPath(gameBaseDir, iniFileName);
                 }
             }
             else
             {
-                Log.Debug($"dxgi.dll not found in game folder, skipping INI file checks.");
-                Chat($"Debug: dxgi.dll not found, skipping INI file checks.");
+                Log.Debug("dxgi.dll not found in game folder, skipping INI file checks.");
+                SendMessage("Debug: dxgi.dll not found, skipping INI file checks.");
             }
 
-            Log.Debug("InitializeFoldersToMonitor finished.");
+            Log.Debug("InitializeDirectoriesToMonitor finished.");
         }
 
-        private void ProcessIniFile(string gameBaseDir, string iniFileName)
+        private void CheckIniFileForScreenshotPath(string gameBaseDir, string iniFileName)
         {
             var iniFilePath = Path.Combine(gameBaseDir, iniFileName);
             Log.Debug($"Checking for {iniFileName} at: {iniFilePath}");
@@ -115,11 +113,11 @@ namespace Sightseeingway
                             Log.Debug($"{iniFileName} SavePath is relative, resolving to absolute path: {resolvedSavePath}");
                         }
 
-                        if (!foldersToMonitor.Contains(resolvedSavePath) && System.IO.Directory.Exists(resolvedSavePath))
+                        if (!directoriesToMonitor.Contains(resolvedSavePath) && Directory.Exists(resolvedSavePath))
                         {
-                            foldersToMonitor.Add(resolvedSavePath);
+                            directoriesToMonitor.Add(resolvedSavePath);
                             Log.Debug($"{iniFileName} SavePath folder added: {resolvedSavePath}");
-                            Chat($"Debug: {iniFileName} SavePath folder added: {resolvedSavePath}");
+                            SendMessage($"Debug: {iniFileName} SavePath folder added: {resolvedSavePath}");
                         }
                         else
                         {
@@ -140,34 +138,33 @@ namespace Sightseeingway
             else
             {
                 Log.Debug($"{iniFileName} not found in game folder: {iniFilePath}");
-                Chat($"Debug: {iniFileName} not found in game folder: {iniFilePath}");
+                SendMessage($"Debug: {iniFileName} not found in game folder: {iniFilePath}");
             }
         }
-   
 
         public void Dispose()
         {
             Log.Debug("Dispose started.");
-            Chat("Plugin Disposing...");
+            SendMessage("Plugin Disposing...");
 
-            foreach (var watcher in watchers)
+            foreach (var watcher in fileWatchers)
             {
                 Log.Debug($"Disposing watcher for folder: {watcher.Path}");
                 watcher.Created -= IO.OnFileCreated;
                 watcher.Dispose();
                 Log.Debug($"Watcher for folder disposed: {watcher.Path}");
             }
-            watchers.Clear();
+            fileWatchers.Clear();
             Log.Debug("Watcher list cleared.");
             Log.Debug("Dispose finished.");
-            Chat("Plugin Disposed.");
+            SendMessage("Plugin Disposed.");
         }
 
-        public static void Chat(string message)
+        public static void SendMessage(string message)
         {
-            if (DEBUG)
+            if (DebugMode)
             {
-                Client.Print(message);
+                Client.PrintMessage(message);
             }
         }
     }

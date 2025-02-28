@@ -5,32 +5,32 @@ using System.Threading;
 using Lumina.Excel.Sheets;
 using Dalamud.Utility;
 using System.Collections.Generic;
-using FFXIVClientStructs.FFXIV.Client.System.Framework;
 
 namespace Sightseeingway
 {
     public static class IO
     {
-        public static void InitializeWatchers(List<string> foldersToMonitor, List<FileSystemWatcher> watchers)
+        public static void SetupWatchers(List<string> foldersToMonitor, List<FileSystemWatcher> watchers)
         {
             Plugin.Log.Debug("InitializeWatchers started.");
             foreach (var folder in foldersToMonitor)
             {
-                if (Directory.Exists(folder))
-                {
-                    Plugin.Log.Debug($"Creating watcher for folder: {folder}");
-                    var watcher = new FileSystemWatcher(folder);
-                    watcher.Created += OnFileCreated;
-                    watcher.EnableRaisingEvents = true;
-                    watchers.Add(watcher);
-                    Plugin.Log.Information($"Monitoring folder: {folder}");
-                    Plugin.Chat($"Monitoring folder: {folder}");
-                }
-                else
+                if (!Directory.Exists(folder))
                 {
                     Plugin.Log.Error($"Folder not found: {folder}");
                     Plugin.ChatGui.PrintError($"[Sightseeingway] Error: Folder not found: {folder}");
+                    continue;
                 }
+
+                Plugin.Log.Debug($"Creating watcher for folder: {folder}");
+                var watcher = new FileSystemWatcher(folder)
+                {
+                    EnableRaisingEvents = true
+                };
+                watcher.Created += OnFileCreated;
+                watchers.Add(watcher);
+                Plugin.Log.Information($"Monitoring folder: {folder}");
+                Plugin.SendMessage($"Monitoring folder: {folder}");
             }
             Plugin.Log.Debug("InitializeWatchers finished.");
         }
@@ -38,18 +38,17 @@ namespace Sightseeingway
         public static void OnFileCreated(object sender, FileSystemEventArgs e)
         {
             var filePath = e.FullPath;
-            var fileName = e.Name;
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
             if (extension != ".jpg" && extension != ".jpeg" && extension != ".png") return;
 
             Plugin.Log.Debug($"File Created event triggered for: {filePath}");
-            Plugin.Chat($"Debug: File Created: {filePath}");
+            Plugin.SendMessage($"Debug: File Created: {filePath}");
 
-            if (Caching.IsInRenameCache(e.FullPath))
+            if (Caching.IsInRenameCache(filePath))
             {
-                Plugin.Log.Debug($"File '{fileName}' is in rename cache, ignoring.");
-                Plugin.Chat($"Debug: Ignoring cached filename: {filePath}");
+                Plugin.Log.Debug($"File '{e.Name}' is in rename cache, ignoring.");
+                Plugin.SendMessage($"Debug: Ignoring cached filename: {filePath}");
                 return;
             }
 
@@ -60,14 +59,14 @@ namespace Sightseeingway
             else
             {
                 Plugin.Log.Warning($"File not released in time for renaming: {filePath}");
-                Plugin.Chat($"Warning: File not released in time: {filePath}");
+                Plugin.SendMessage($"Warning: File not released in time: {filePath}");
             }
         }
 
         public static bool WaitForFileRelease(string filePath)
         {
             Plugin.Log.Debug($"WaitForFileRelease started for: {filePath}");
-            var maxTries = 10;
+            const int maxTries = 10;
             for (var i = 0; i < maxTries; ++i)
             {
                 try
@@ -100,72 +99,20 @@ namespace Sightseeingway
             Plugin.Log.Debug($"RenameFile started for: {filePath}");
             try
             {
-                var map = "";
-                var position = "";
-                var eorzeaTime = "";
-                var weather = "";
-                var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
-
-                var fileCreationTime = File.GetCreationTime(filePath);
-                var timestamp = fileCreationTime.ToString("yyyyMMddHHmmss") + fileCreationTime.Millisecond.ToString("D3");
-
-                if (character != "")
+                var newFilePath = ResolveNewFileName(filePath);
+                if (newFilePath == null)
                 {
-                    var mapExcelSheet = Plugin.DataManager.GetExcelSheet<Map>();
-                    if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
-                    {
-                        var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
-                        map = mapType.PlaceName.Value.Name.ExtractText() ?? "";
-
-                        Plugin.Log.Debug($"Map name resolved: {map}");
-
-                        var mapVector = MapUtil.WorldToMap(Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
-
-                        Vector3 mapPlace = new(
-                            (int)MathF.Round(mapVector.X * 10, 1) / 10f,
-                            (int)MathF.Round(mapVector.Y * 10, 1) / 10f,
-                            (int)MathF.Round(mapVector.Z * 10, 1) / 10f
-                            );
-
-                        position =
-                            mapPlace == Vector3.Zero ? "" :
-                            mapPlace.Z == 0.0 ? $" ({mapPlace.X:0.0},{mapPlace.Y:0.0})" :
-                            $" ({mapPlace.X:0.0},{mapPlace.Y:0.0},{mapPlace.Z:0.0})";
-                    }
-                    else
-                    {
-                        Plugin.Log.Warning("Map sheet not found or MapId is 0.");
-                    }
-
-                    if (map != "")
-                    {
-                        // Get in-game Eorzea time
-                        eorzeaTime = Client.GetCurrentEorzeaTime().GetDayPeriodWithGoldenHour(true);
-                        weather = Client.GetCurrentWeather();
-                    }
+                    Plugin.Log.Error($"Failed to resolve new file name for: {filePath}");
+                    return;
                 }
-                // We should have all parts at this point. Let's build the new filename.
-
-                character = PrepareNamePart(character);
-                map = PrepareNamePart(map);
-                weather = PrepareNamePart(weather);
-                eorzeaTime = PrepareNamePart(eorzeaTime);
-
-                var extension = Path.GetExtension(filePath).ToLowerInvariant();
-
-                var newFilename = $"{timestamp}{character}{map}{position}{eorzeaTime}{weather}{extension}";
-
-                var directory = Path.GetDirectoryName(filePath);
-                var newFilePath = Path.Combine(directory, newFilename);
 
                 Plugin.Log.Debug($"Renaming '{filePath}' to '{newFilePath}'");
 
-                Caching.AddToRenameCache(newFilename);
+                Caching.AddToRenameCache(Path.GetFileName(newFilePath));
                 File.Move(filePath, newFilePath);
 
                 Plugin.Log.Information($"Renamed file to: {newFilePath}");
-
-                Client.Print($"Screenshot renamed: {newFilename}");
+                Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
             }
             catch (Exception ex)
             {
@@ -175,12 +122,58 @@ namespace Sightseeingway
             Plugin.Log.Debug($"RenameFile finished for: {filePath}");
         }
 
-        public static string PrepareNamePart(string part)
+        public static string ResolveNewFileName(string filePath)
         {
-            if (part.IsNullOrEmpty()) return "";
-            return "-" + part;
+            var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
+            var fileCreationTime = File.GetCreationTime(filePath);
+            var timestamp = fileCreationTime.ToString("yyyyMMddHHmmssfff");
+
+            var map = "";
+            var position = "";
+            var eorzeaTime = "";
+            var weather = "";
+
+            if (!string.IsNullOrEmpty(character))
+            {
+                var mapExcelSheet = Plugin.DataManager.GetExcelSheet<Map>();
+                if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
+                {
+                    var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
+                    map = mapType.PlaceName.Value.Name.ExtractText() ?? "";
+
+                    Plugin.Log.Debug($"Map name resolved: {map}");
+
+                    var mapVector = MapUtil.WorldToMap(Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
+
+                    var mapPlace = new Vector3(
+                        (int)MathF.Round(mapVector.X * 10, 1) / 10f,
+                        (int)MathF.Round(mapVector.Y * 10, 1) / 10f,
+                        (int)MathF.Round(mapVector.Z * 10, 1) / 10f
+                    );
+
+                    position = mapPlace == Vector3.Zero ? "" :
+                        mapPlace.Z == 0.0 ? $" ({mapPlace.X:0.0},{mapPlace.Y:0.0})" :
+                        $" ({mapPlace.X:0.0},{mapPlace.Y:0.0},{mapPlace.Z:0.0})";
+                }
+                else
+                {
+                    Plugin.Log.Warning("Map sheet not found or MapId is 0.");
+                }
+
+                if (!string.IsNullOrEmpty(map))
+                {
+                    eorzeaTime = Client.GetCurrentEorzeaDateTime().DetermineDayPeriod(true);
+                    weather = Client.GetCurrentWeatherName();
+                }
+            }
+
+            var newFilename = $"{timestamp}{NamePart(character)}{NamePart(map)}{position}{NamePart(eorzeaTime)}{NamePart(weather)}{Path.GetExtension(filePath).ToLowerInvariant()}";
+            return Path.Combine(Path.GetDirectoryName(filePath), newFilename);
         }
 
-
+        public static string NamePart(string part)
+        {
+            return string.IsNullOrEmpty(part) ? "" : "-" + part;
+        }
     }
 }

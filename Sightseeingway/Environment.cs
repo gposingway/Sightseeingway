@@ -102,7 +102,7 @@ namespace Sightseeingway
                     Plugin.Log.Debug($"ScreenshotDir is relative, resolved to: {resolvedPath}");
                 }
 
-                Plugin.Chat($"ffxiv.cfg Screenshot path: {resolvedPath}");
+                Plugin.SendMessage($"ffxiv.cfg Screenshot path: {resolvedPath}");
                 if (Directory.Exists(resolvedPath)) return resolvedPath;
 
                 var standardDocumentsPath = System.Environment.GetFolderPath(System.Environment.SpecialFolder.MyDocuments);
@@ -118,7 +118,7 @@ namespace Sightseeingway
                 }
 
                 Plugin.Log.Debug($"Screenshot path from ffxiv.cfg (potentially corrected): {resolvedPath}");
-                Plugin.Chat($"ffxiv.cfg Screenshot path exists? {Directory.Exists(resolvedPath)}");
+                Plugin.SendMessage($"ffxiv.cfg Screenshot path exists? {Directory.Exists(resolvedPath)}");
 
                 return resolvedPath;
             }

@@ -5,7 +5,6 @@ using FFXIVClientStructs.FFXIV.Client.Game;
 using Lumina.Excel.Sheets;
 using System;
 using System.Collections.Generic;
-using static System.Runtime.InteropServices.JavaScript.JSType;
 
 namespace Sightseeingway
 {
@@ -13,47 +12,46 @@ namespace Sightseeingway
     {
         // Reference: https://github.com/Infiziert90/PlayerTrack/blob/a1d4748abf0a33d71e156e0d380382b613b7a4f4/PlayerTrack.Plugin/Extensions/ChatGuiExtension.cs#L32
 
-
-        public static void Print(string message)
+        public static void PrintMessage(string message)
         {
             var payloads = new List<Payload> { new TextPayload(message) };
-            Print(payloads);
+            PrintPayloads(payloads);
         }
 
-        public static void Print(IEnumerable<Payload> payloads)
+        public static void PrintPayloads(IEnumerable<Payload> payloads)
         {
             Plugin.ChatGui.Print(new XivChatEntry
             {
-                Message = BuildSeString(Plugin.PluginInterface.InternalName, payloads),
+                Message = CreateSeString(Plugin.PluginInterface.InternalName, payloads),
                 Type = XivChatType.Debug,
             });
         }
 
-        private static SeString BuildSeString(string? pluginName, IEnumerable<Payload> payloads)
+        private static SeString CreateSeString(string? pluginName, IEnumerable<Payload> payloads)
         {
-            var builder = new SeStringBuilder();
-            builder.AddUiForeground(548);
-            builder.AddText($"[{pluginName}] ");
-            builder.AddUiForegroundOff();
-            builder.Append(payloads);
+            var seStringBuilder = new SeStringBuilder();
+            seStringBuilder.AddUiForeground(548);
+            seStringBuilder.AddText($"[{pluginName}] ");
+            seStringBuilder.AddUiForegroundOff();
+            seStringBuilder.Append(payloads);
 
-            return builder.BuiltString;
+            return seStringBuilder.BuiltString;
         }
 
-        public static unsafe string GetCurrentWeather()
+        public static unsafe string GetCurrentWeatherName()
         {
-            var weatherId = WeatherManager.Instance()->GetCurrentWeather();
+            var currentWeatherId = WeatherManager.Instance()->GetCurrentWeather();
             var weatherSheet = Plugin.DataManager.GetExcelSheet<Weather>();
 
-            var weatherName = weatherSheet.GetRow(weatherId).Name.ExtractText();
+            var currentWeatherName = weatherSheet.GetRow(currentWeatherId).Name.ExtractText();
 
-            return weatherName;
+            return currentWeatherName;
         }
 
-        public static unsafe DateTime GetCurrentEorzeaTime()
+        public static unsafe DateTime GetCurrentEorzeaDateTime()
         {
-            var eorzeaTime = DateTimeOffset.FromUnixTimeSeconds(FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance()->ClientTime.EorzeaTime);
-            return eorzeaTime.DateTime;
+            var eorzeaDateTime = DateTimeOffset.FromUnixTimeSeconds(FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance()->ClientTime.EorzeaTime);
+            return eorzeaDateTime.DateTime;
         }
     }
 }
