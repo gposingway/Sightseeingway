@@ -4,12 +4,15 @@ using System.IO;
 using Dalamud.Plugin.Services;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 
 namespace Sightseeingway
 {
-
     public sealed class Plugin : IDalamudPlugin
     {
+        // Static debug flag
+        public static bool DebugMode = false;
+
         [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
         [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
         [PluginService] internal static IFramework Framework { get; private set; } = null!;
@@ -21,9 +24,11 @@ namespace Sightseeingway
         private readonly List<FileSystemWatcher> fileWatchers = new();
         private readonly List<string> directoriesToMonitor = new();
         private readonly List<string> iniFilesToCheck = new() { "ReShade.ini", "GShade.ini" };
+        private const string ShadingwayStateFileName = "shadingway.addon-state.json";
 
-        // Static debug flag
-        public static bool DebugMode = false;
+
+        // Hold the shadingway state
+        public ShadingwayState? CurrentShadingwayState { get; private set; }
 
         public Plugin()
         {
@@ -34,6 +39,7 @@ namespace Sightseeingway
 
             InitializeDirectoriesToMonitor();
             IO.SetupWatchers(directoriesToMonitor, fileWatchers);
+            SetupShadingwayWatcher();
 
             Log.Debug("Plugin constructor finished.");
             SendMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
@@ -142,6 +148,70 @@ namespace Sightseeingway
             }
         }
 
+        private void SetupShadingwayWatcher()
+        {
+            var gameBaseDir = Environment.GetGameDirectory();
+            var shadingwayStateFilePath = Path.Combine(gameBaseDir, ShadingwayStateFileName);
+
+            if (File.Exists(shadingwayStateFilePath))
+            {
+                Log.Debug($"Found {ShadingwayStateFileName} at: {shadingwayStateFilePath}");
+
+                // Load the initial state immediately, waiting for file release
+                if (IO.WaitForFileReleaseGeneric(shadingwayStateFilePath))
+                {
+                    CurrentShadingwayState = IO.LoadShadingwayState(shadingwayStateFilePath);
+
+                    if (CurrentShadingwayState?.Pid == Process.GetCurrentProcess().Id)
+                    {
+                        Client.PrintMessage("Ooh! Shadingway spotted! *waves excitedly*");
+                    }
+                }
+                else
+                {
+                    Log.Warning($"Could not load initial Shadingway state due to file access issues.");
+                    ChatGui.PrintError("[Sightseeingway] Warning: Could not read Shadingway state file on startup.");
+                }
+
+
+                var watcher = new FileSystemWatcher(gameBaseDir)
+                {
+                    Filter = ShadingwayStateFileName,
+                    EnableRaisingEvents = true,
+                    NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName
+                };
+                watcher.Changed += OnShadingwayStateFileChanged; // Use Plugin's event handler
+                watcher.Created += OnShadingwayStateFileChanged; // Use Plugin's event handler
+                watcher.Renamed += OnShadingwayStateFileChanged; // Use Plugin's event handler
+                fileWatchers.Add(watcher);
+                Log.Information($"Monitoring {ShadingwayStateFileName} in: {gameBaseDir}");
+                SendMessage($"Monitoring {ShadingwayStateFileName} in game folder.");
+            }
+            else
+            {
+                Log.Debug($"{ShadingwayStateFileName} not found in game folder: {shadingwayStateFilePath}");
+                SendMessage($"Debug: {ShadingwayStateFileName} not found in game folder, monitoring disabled.");
+            }
+        }
+
+        // Plugin's own event handler to update the state
+        private void OnShadingwayStateFileChanged(object sender, FileSystemEventArgs e)
+        {
+            Log.Debug($"Shadingway State File changed: {e.FullPath}");
+            SendMessage($"Debug: Shadingway State File changed: {e.FullPath}");
+            // Wait for file release before loading state on file change
+            if (IO.WaitForFileReleaseGeneric(e.FullPath))
+            {
+                CurrentShadingwayState = IO.LoadShadingwayState(e.FullPath); // Load state on file change
+            }
+            else
+            {
+                Log.Warning($"Could not reload Shadingway state due to file access issues.");
+                ChatGui.PrintError("[Sightseeingway] Warning: Could not read Shadingway state file on file change.");
+            }
+        }
+
+
         public void Dispose()
         {
             Log.Debug("Dispose started.");
@@ -151,6 +221,7 @@ namespace Sightseeingway
             {
                 Log.Debug($"Disposing watcher for folder: {watcher.Path}");
                 watcher.Created -= IO.OnFileCreated;
+                watcher.Changed -= OnShadingwayStateFileChanged; // Use Plugin's event handler
                 watcher.Dispose();
                 Log.Debug($"Watcher for folder disposed: {watcher.Path}");
             }
