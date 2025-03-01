@@ -17,7 +17,6 @@ Take Sightseeingway with you! This Dalamud addon for FFXIV automatically names y
 This addon is perfect for:
 
   * **Gpose Enthusiasts:**  Easily catalog your scenic gpose locations with time and weather context.
-  * **Screenshot Collectors:**  Organize your growing collection of FFXIV memories with comprehensive details.
   * **Location Recall:**  Quickly find that amazing vista you screenshotted weeks ago, remembering not just the place but also the time and weather!
 
 No more generic screenshot names like `ffxiv_001.png`!  Sightseeingway helps you keep your FFXIV screenshot library organized and meaningful, now with even more detail.
