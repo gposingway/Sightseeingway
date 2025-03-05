@@ -282,7 +282,6 @@ namespace Sightseeingway
                 }
             }
 
-
             if (EffectsEnabled)
             {
                 if (!string.IsNullOrEmpty(CurrentPresetName))
@@ -292,6 +291,13 @@ namespace Sightseeingway
             }
 
             var newFilename = $"{timestamp}{NamePart(character)}{NamePart(map)}{position}{NamePart(eorzeaTime)}{NamePart(weather)}{presetNamePart}{Path.GetExtension(filePath).ToLowerInvariant()}";
+
+            // Clean up invalid characters from the filename
+            foreach (var c in Path.GetInvalidFileNameChars())
+            {
+                newFilename = newFilename.Replace(c.ToString(), "");
+            }
+
             return Path.Combine(Path.GetDirectoryName(filePath), newFilename);
         }
 
