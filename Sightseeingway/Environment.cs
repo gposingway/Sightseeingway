@@ -2,6 +2,8 @@ using System.IO;
 using System;
 using System.Diagnostics;
 using System.Linq;
+using Dalamud.Game.Config;
+using Dalamud.Plugin.Services;
 
 namespace Sightseeingway
 {
@@ -61,39 +63,16 @@ namespace Sightseeingway
 
         public static unsafe string? GetScreenshotFolderFromConfig()
         {
-            var CSFrameworkInstance = FFXIVClientStructs.FFXIV.Client.System.Framework.Framework.Instance();
-
             Plugin.Log.Debug("GetScreenshotFolderFromConfig started.");
             try
             {
-                var gameConfigPath = CSFrameworkInstance->UserPathString.ToString(); // General game config folder
-                var ffxivCfgFile = CSFrameworkInstance->ConfigPath.ToString(); // Direct path to ffxiv.cfg
 
-                if (string.IsNullOrEmpty(ffxivCfgFile) || !File.Exists(ffxivCfgFile))
-                {
-                    Plugin.Log.Warning($"ffxiv.cfg file not found at: {ffxivCfgFile}");
-                    return null;
-                }
+                string configScreenshotDir;
+                var gameConfigPath = GetGameDirectory();
+                Plugin.GameConfig.TryGet(SystemConfigOption.ScreenShotDir, out configScreenshotDir);
+                if (string.IsNullOrEmpty(configScreenshotDir)) return null;
 
-                Plugin.Log.Debug($"Config path: {gameConfigPath}, ffxiv.cfg path: {ffxivCfgFile}");
 
-                var lines = File.ReadAllLines(ffxivCfgFile);
-                string? configScreenshotDir = null;
-
-                foreach (var line in lines)
-                {
-                    if (line.Trim().StartsWith("ScreenShotDir"))
-                    {
-                        configScreenshotDir = line.Split('\t').LastOrDefault()?.Trim().Trim('"');
-                        if (!string.IsNullOrEmpty(configScreenshotDir)) break; // Found the screenshot directory.
-                    }
-                }
-
-                if (string.IsNullOrEmpty(configScreenshotDir))
-                {
-                    Plugin.Log.Debug("ScreenShotDir not found in ffxiv.cfg.");
-                    return null; // Not found
-                }
 
                 var resolvedPath = configScreenshotDir.Trim();
                 if (!Path.IsPathRooted(configScreenshotDir))
