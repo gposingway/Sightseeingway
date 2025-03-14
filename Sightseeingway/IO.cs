@@ -7,6 +7,7 @@ using Dalamud.Utility;
 using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Diagnostics;
+using System.Collections.Concurrent;
 
 namespace Sightseeingway
 {
@@ -98,7 +99,7 @@ namespace Sightseeingway
         public static bool WaitForFileReleaseGeneric(string filePath, FileAccess fileAccess = FileAccess.Read)
         {
             Plugin.SendMessage($"WaitForFileReleaseGeneric started for: {filePath}, FileAccess: {fileAccess}");
-            const int maxTries = 10;
+            const int maxTries = 30;
             for (var i = 0; i < maxTries; ++i)
             {
                 try
@@ -113,7 +114,7 @@ namespace Sightseeingway
                 catch (IOException)
                 {
                     Plugin.SendMessage($"IOException on attempt {i + 1}: {filePath} - File likely still in use.");
-                    Thread.Sleep(250);
+                    Thread.Sleep(500);
                 }
                 catch (Exception ex)
                 {
@@ -213,17 +214,13 @@ namespace Sightseeingway
             try
             {
                 var newFilePath = ResolveNewFileName(filePath);
-                if (newFilePath == null)
-                {
-                    Plugin.Log.Error($"Failed to resolve new file name for: {filePath}");
-                    return;
-                }
+                if (newFilePath == null) return;
 
                 Plugin.SendMessage($"Renaming '{filePath}' to '{newFilePath}'");
 
                 Caching.AddToRenameCache(Path.GetFileName(newFilePath));
 
-                MoveFileWithRetry(filePath, newFilePath);
+                QueueRenameOperation(filePath, newFilePath);
 
                 Plugin.Log.Information($"Renamed file to: {newFilePath}");
                 Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
@@ -247,6 +244,13 @@ namespace Sightseeingway
             var eorzeaTime = "";
             var weather = "";
             var presetNamePart = "";
+
+            var fileName = Path.GetFileName(filePath);
+
+            // Check if the filename starts with a timestamp; if so, just ignore it.
+            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), "yyyyMMddHHmmssfff", null, System.Globalization.DateTimeStyles.None, out _)) return null;
+
+            var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
 
             if (!string.IsNullOrEmpty(character))
             {
@@ -290,9 +294,9 @@ namespace Sightseeingway
                 }
             }
 
-            var newFilename = $"{timestamp}{NamePart(character)}{NamePart(map)}{position}{NamePart(eorzeaTime)}{NamePart(weather)}{presetNamePart}{Path.GetExtension(filePath).ToLowerInvariant()}";
+            var newFilename = $"{timestamp}{NamePart(character)}{NamePart(map)}{position}{NamePart(eorzeaTime)}{NamePart(weather)}{presetNamePart}{fileExtension}";
 
-            // Clean up invalid characters from the filename
+            // Clean up invalid characters from the filename  
             foreach (var c in Path.GetInvalidFileNameChars())
             {
                 newFilename = newFilename.Replace(c.ToString(), "");
@@ -305,6 +309,41 @@ namespace Sightseeingway
         {
             return string.IsNullOrEmpty(part) ? "" : "-" + part;
         }
+
+        private static readonly ConcurrentQueue<(string SourceNamePath, string FinalName)> renameQueue = new();
+        private static readonly Timer renameTimer = new(RenameQueuedFiles, null, Timeout.Infinite, Timeout.Infinite);
+
+        public static void QueueRenameOperation(string sourceNamePath, string finalName)
+        {
+            renameQueue.Enqueue((sourceNamePath, finalName));
+            renameTimer.Change(3000, Timeout.Infinite); // Wait for 3 seconds without writes
+        }
+
+        private static void RenameQueuedFiles(object? state)
+        {
+            while (renameQueue.TryDequeue(out var renameOperation))
+            {
+                if (WaitForFileReleaseGeneric(renameOperation.SourceNamePath, FileAccess.ReadWrite))
+                {
+                    try
+                    {
+                        MoveFileWithRetry(renameOperation.SourceNamePath, renameOperation.FinalName);
+                        Plugin.Log.Information($"File renamed from {renameOperation.SourceNamePath} to {renameOperation.FinalName}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Plugin.Log.Error($"Error renaming file from {renameOperation.SourceNamePath} to {renameOperation.FinalName}: {ex}");
+                        Plugin.ChatGui.PrintError($"[Sightseeingway] Error renaming {Path.GetFileName(renameOperation.SourceNamePath)}: {ex.Message}");
+                    }
+                }
+                else
+                {
+                    Plugin.Log.Warning($"File not released in time for renaming: {renameOperation.SourceNamePath}");
+                    Plugin.ChatGui.PrintError($"[Sightseeingway] Warning: File {Path.GetFileName(renameOperation.SourceNamePath)} not released in time for renaming.");
+                }
+            }
+        }
+
     }
 
     public class ShadingwayState
@@ -327,4 +366,7 @@ namespace Sightseeingway
         public string? Path { get; set; }
         // Add other properties from "preset" if needed
     }
+
+
+
 }
