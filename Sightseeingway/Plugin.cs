@@ -17,13 +17,14 @@ namespace Sightseeingway
         [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
         [PluginService] internal static IFramework Framework { get; private set; } = null!;
         [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+        [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
 
-        private readonly List<FileSystemWatcher> fileWatchers = new();
-        private readonly List<string> directoriesToMonitor = new();
-        private readonly List<string> iniFilesToCheck = new() { "ReShade.ini", "GShade.ini" };
+        private readonly List<FileSystemWatcher> fileWatchers = [];
+        private readonly List<string> directoriesToMonitor = [];
+        private readonly List<string> iniFilesToCheck = ["ReShade.ini", "GShade.ini"];
         private const string ShadingwayStateFileName = "shadingway.addon-state.json";
 
 
@@ -41,13 +42,37 @@ namespace Sightseeingway
             IO.SetupWatchers(directoriesToMonitor, fileWatchers);
             SetupShadingwayWatcher();
 
+            SetupConfigChangeWatcher();
+
             Log.Debug("Plugin constructor finished.");
             SendMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
         }
 
+        private void SetupConfigChangeWatcher()
+        {
+            GameConfig.SystemChanged += (sender, args) =>
+            {
+                Log.Debug("GameConfig.SystemChanged event fired.");
+                SendMessage("Debug: GameConfig.SystemChanged event fired.");
+
+                {
+                    Log.Debug("GameLanguage changed, reinitializing directories to monitor.");
+                    SendMessage("Debug: GameLanguage changed, reinitializing directories to monitor.");
+                    InitializeDirectoriesToMonitor();
+                    IO.SetupWatchers(directoriesToMonitor, fileWatchers);
+                }
+            };
+        }
+
         private void InitializeDirectoriesToMonitor()
         {
+
             Log.Debug("InitializeDirectoriesToMonitor started.");
+
+            foreach (var watcher in fileWatchers) watcher.Dispose();
+            fileWatchers.Clear();
+            directoriesToMonitor.Clear();
+
             var defaultScreenshotFolder = Environment.GetDefaultScreenshotFolder();
 
             if (defaultScreenshotFolder != null)
