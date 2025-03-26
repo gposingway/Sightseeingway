@@ -6,7 +6,7 @@ Take Sightseeingway with you! This Dalamud addon for FFXIV automatically names y
 
 ## Description
 
-**Sightseeingway** is a Dalamud addon for Final Fantasy XIV designed to enhance your screenshot organization.  It automatically renames your saved screenshots to include valuable information directly in the filename:
+**Sightseeingway** is a Dalamud addon for XIV designed to help with screenshot organization.  It automatically renames your saved screenshots to include information directly in the filename:
 
   * **Character Name:**  Know exactly which character took the screenshot.
   * **Map Name:**  Quickly identify the in-game zone where the screenshot was taken.
