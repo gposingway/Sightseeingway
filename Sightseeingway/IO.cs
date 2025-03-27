@@ -60,7 +60,7 @@ namespace Sightseeingway
                 using (StreamReader file = File.OpenText(filePath))
                 using (JsonTextReader reader = new JsonTextReader(file))
                 {
-                    JsonSerializer serializer = new JsonSerializer();
+                    var serializer = new JsonSerializer();
                     state = serializer.Deserialize<ShadingwayState>(reader);
                     if (state != null)
                     {
@@ -211,26 +211,31 @@ namespace Sightseeingway
         public static void RenameFile(string filePath)
         {
             Plugin.SendMessage($"RenameFile started for: {filePath}");
-            try
+
+            Plugin.Framework.RunOnTick(() =>
             {
-                var newFilePath = ResolveNewFileName(filePath);
-                if (newFilePath == null) return;
+                try
+                {
+                    var newFilePath = ResolveNewFileName(filePath);
+                    if (newFilePath == null) return;
 
-                Plugin.SendMessage($"Renaming '{filePath}' to '{newFilePath}'");
+                    Plugin.SendMessage($"Renaming '{filePath}' to '{newFilePath}'");
 
-                Caching.AddToRenameCache(Path.GetFileName(newFilePath));
+                    Caching.AddToRenameCache(Path.GetFileName(newFilePath));
 
-                QueueRenameOperation(filePath, newFilePath);
+                    QueueRenameOperation(filePath, newFilePath);
 
-                Plugin.Log.Information($"Renamed file to: {newFilePath}");
-                Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
-            }
-            catch (Exception ex)
-            {
-                Plugin.Log.Error($"Error during RenameFile for {filePath}: {ex}");
-                Plugin.ChatGui.PrintError($"[Sightseeingway] Error renaming {Path.GetFileName(filePath)}: {ex.Message}");
-            }
-            Plugin.SendMessage($"RenameFile finished for: {filePath}");
+                    Plugin.Log.Information($"Renamed file to: {newFilePath}");
+                    Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
+                }
+                catch (Exception ex)
+                {
+                    Plugin.Log.Error($"Error during RenameFile for {filePath}: {ex}");
+                    Plugin.ChatGui.PrintError($"[Sightseeingway] Error renaming {Path.GetFileName(filePath)}: {ex.Message}");
+                }
+
+                Plugin.SendMessage($"RenameFile finished for: {filePath}");
+            }, default, 30);
         }
 
         public static string ResolveNewFileName(string filePath)
