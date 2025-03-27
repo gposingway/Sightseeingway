@@ -88,12 +88,16 @@ namespace Sightseeingway
                 var oneDriveDocumentsPath = GetOneDriveDocumentPath() ?? GetOneDriveDocumentPathFromRegistry();
 
                 var laststandardDocumentsPart = Path.GetFileName(standardDocumentsPath);
-                var lastOneDriveDocumentsPart = Path.GetFileName(oneDriveDocumentsPath);
 
-                if (resolvedPath.Contains(lastOneDriveDocumentsPart))
+                if (oneDriveDocumentsPath != null) // OneDrive is enabled
                 {
-                    // replace the start of resolvedPath up to lastOneDriveDocumentsPart with the equivalent part of standardDocumentsPath
-                    resolvedPath = resolvedPath.Replace(resolvedPath.Substring(0, resolvedPath.IndexOf(lastOneDriveDocumentsPart) + lastOneDriveDocumentsPart.Length), standardDocumentsPath);
+                    var lastOneDriveDocumentsPart = Path.GetFileName(oneDriveDocumentsPath);
+
+                    if (resolvedPath.Contains(lastOneDriveDocumentsPart))
+                    {
+                        // replace the start of resolvedPath up to lastOneDriveDocumentsPart with the equivalent part of standardDocumentsPath
+                        resolvedPath = resolvedPath.Replace(resolvedPath.Substring(0, resolvedPath.IndexOf(lastOneDriveDocumentsPart) + lastOneDriveDocumentsPart.Length), standardDocumentsPath);
+                    }
                 }
 
                 Plugin.Log.Debug($"Screenshot path from ffxiv.cfg (potentially corrected): {resolvedPath}");
