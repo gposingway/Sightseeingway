@@ -24,7 +24,6 @@ namespace Sightseeingway
                 if (!Directory.Exists(folder))
                 {
                     Plugin.Log.Error($"Folder not found: {folder}");
-                    Plugin.ChatGui.PrintError($"[Sightseeingway] Error: Folder not found: {folder}");
                     continue;
                 }
 
