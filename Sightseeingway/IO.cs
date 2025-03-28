@@ -18,26 +18,15 @@ namespace Sightseeingway
 
         public static void SetupWatchers(List<string> foldersToMonitor, List<FileSystemWatcher> watchers)
         {
-            Plugin.SendMessage("InitializeWatchers started.");
             foreach (var folder in foldersToMonitor)
             {
-                if (!Directory.Exists(folder))
-                {
-                    Plugin.Log.Error($"Folder not found: {folder}");
-                    continue;
-                }
+                if (!Directory.Exists(folder)) continue;
 
-                Plugin.SendMessage($"Creating watcher for folder: {folder}");
-                var watcher = new FileSystemWatcher(folder)
-                {
-                    EnableRaisingEvents = true
-                };
+                var watcher = new FileSystemWatcher(folder) { EnableRaisingEvents = true };
+
                 watcher.Created += OnFileCreated;
                 watchers.Add(watcher);
-                Plugin.Log.Information($"Monitoring folder: {folder}");
-                Plugin.SendMessage($"Monitoring folder: {folder}");
             }
-            Plugin.SendMessage("InitializeWatchers finished.");
         }
 
         // Modified to return ShadingwayState and renamed to LoadShadingwayState
