@@ -5,6 +5,7 @@ using Dalamud.Plugin.Services;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using Dalamud.Game.Config;
 
 namespace Sightseeingway
 {
@@ -52,12 +53,10 @@ namespace Sightseeingway
         {
             GameConfig.SystemChanged += (sender, args) =>
             {
-                Log.Debug("GameConfig.SystemChanged event fired.");
-                SendMessage("Debug: GameConfig.SystemChanged event fired.");
-
+                if (args.Option is SystemConfigOption option && option == SystemConfigOption.ScreenShotDir)
                 {
-                    Log.Debug("GameLanguage changed, reinitializing directories to monitor.");
-                    SendMessage("Debug: GameLanguage changed, reinitializing directories to monitor.");
+                    Log.Debug("Screenshot directory setting changed, reinitializing directories to monitor.");
+                    SendMessage("Debug: Screenshot folder changed, reinitializing directories to monitor.");
                     InitializeDirectoriesToMonitor();
                     IO.SetupWatchers(directoriesToMonitor, fileWatchers);
                 }
