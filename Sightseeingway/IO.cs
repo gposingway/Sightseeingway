@@ -342,11 +342,6 @@ namespace Sightseeingway
             return Path.Combine(Path.GetDirectoryName(filePath) ?? string.Empty, constructedFilename);
         }
 
-        public static string NamePart(string part)
-        {
-            return FilenameGenerator.FormatNamePart(part);
-        }
-
         private static readonly ConcurrentQueue<(string SourceNamePath, string FinalName)> RenameQueue = new();
         private static readonly Timer RenameTimer = new(RenameQueuedFiles, null, Timeout.Infinite, Timeout.Infinite);
 
