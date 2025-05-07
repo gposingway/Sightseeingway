@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections.Concurrent;
+using System.Linq; // Added missing using directive
 
 namespace Sightseeingway
 {
@@ -228,22 +229,51 @@ namespace Sightseeingway
 
         public static string ResolveNewFileName(string filePath)
         {
-            var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
+            var fileName = Path.GetFileName(filePath);
+            var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
+            
+            // Check if the filename starts with a timestamp; if so, just ignore it.
+            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), "yyyyMMddHHmmssfff", null, System.Globalization.DateTimeStyles.None, out _)) return null;
+
+            // Get configuration
+            var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            
+            // Prepare a clean field order for generating the filename to prevent duplicates
+            var cleanFieldOrder = new List<FilenameField>();
+            var seenFieldsInOrder = new HashSet<FilenameField>();
+
+            // Ensure Timestamp is always first if it's in the config's order or as a default
+            if (config.FieldOrder.Contains(FilenameField.Timestamp))
+            {
+                cleanFieldOrder.Add(FilenameField.Timestamp);
+                seenFieldsInOrder.Add(FilenameField.Timestamp);
+            } else {
+                // Fallback if Timestamp somehow missing from config.FieldOrder, though UI should prevent this.
+                cleanFieldOrder.Add(FilenameField.Timestamp);
+                seenFieldsInOrder.Add(FilenameField.Timestamp);
+            }
+
+            // Add unique fields from config.FieldOrder, maintaining their relative order
+            foreach (var field in config.FieldOrder)
+            {
+                if (seenFieldsInOrder.Add(field)) // .Add returns true if item was added (i.e., not seen before)
+                {
+                    cleanFieldOrder.Add(field);
+                }
+            }
+            // At this point, cleanFieldOrder contains Timestamp and unique fields from config.FieldOrder.
+            // We don't add missing enum fields here as IO should respect the configured fields.
+            // The primary goal here is to prevent duplication from a malformed config.FieldOrder.
+
+            // Get all field values upfront
             var fileCreationTime = File.GetCreationTime(filePath);
             var timestamp = fileCreationTime.ToString("yyyyMMddHHmmssfff");
-
+            var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
             var map = "";
             var position = "";
             var eorzeaTime = "";
             var weather = "";
             var presetNamePart = "";
-
-            var fileName = Path.GetFileName(filePath);
-
-            // Check if the filename starts with a timestamp; if so, just ignore it.
-            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), "yyyyMMddHHmmssfff", null, System.Globalization.DateTimeStyles.None, out _)) return null;
-
-            var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
 
             if (!string.IsNullOrEmpty(character))
             {
@@ -251,21 +281,42 @@ namespace Sightseeingway
                 if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
                 {
                     var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
-                    map = mapType.PlaceName.Value.Name.ExtractText() ?? "";
+                    if (mapType.RowId > 0) // Check if valid row
+                    {
+                        try
+                        {
+                            var placeName = mapType.PlaceName.Value;
+                            var extractedName = placeName.Name.ToString();
+                            if (!string.IsNullOrEmpty(extractedName))
+                            {
+                                map = extractedName;
+                            }
+                        }
+                        catch (Exception ex)
+                        {
+                            Plugin.Log.Debug($"Error extracting map name: {ex.Message}");
+                        }
 
-                    Plugin.SendMessage($"Map name resolved: {map}");
+                        Plugin.SendMessage($"Map name resolved: {map}");
 
-                    var mapVector = MapUtil.WorldToMap(Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
-
-                    var mapPlace = new Vector3(
-                        (int)MathF.Round(mapVector.X * 10, 1) / 10f,
-                        (int)MathF.Round(mapVector.Y * 10, 1) / 10f,
-                        (int)MathF.Round(mapVector.Z * 10, 1) / 10f
-                    );
-
-                    position = mapPlace == Vector3.Zero ? "" :
-                        mapPlace.Z == 0.0 ? $" ({mapPlace.X:0.0},{mapPlace.Y:0.0})" :
-                        $" ({mapPlace.X:0.0},{mapPlace.Y:0.0},{mapPlace.Z:0.0})";
+                        try
+                        {
+                            var playerPos = Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero;
+                            var mapVector = MapUtil.WorldToMap(playerPos, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
+                            var mapPlace = new Vector3(
+                                (int)MathF.Round(mapVector.X * 10, 1) / 10f,
+                                (int)MathF.Round(mapVector.Y * 10, 1) / 10f,
+                                (int)MathF.Round(mapVector.Z * 10, 1) / 10f
+                            );
+                            position = mapPlace == Vector3.Zero ? "" :
+                                mapPlace.Z == 0.0 ? $" ({mapPlace.X:0.0},{mapPlace.Y:0.0})" :
+                                $" ({mapPlace.X:0.0},{mapPlace.Y:0.0},{mapPlace.Z:0.0})";
+                        }
+                        catch (Exception ex)
+                        {
+                            Plugin.Log.Debug($"Error calculating coordinates: {ex.Message}");
+                        }
+                    }
                 }
                 else
                 {
@@ -283,19 +334,51 @@ namespace Sightseeingway
             {
                 if (!string.IsNullOrEmpty(CurrentPresetName))
                 {
-                    presetNamePart = NamePart(CurrentPresetName);
+                    presetNamePart = CurrentPresetName;
                 }
             }
 
-            var newFilename = $"{timestamp}{NamePart(character)}{NamePart(map)}{position}{NamePart(eorzeaTime)}{NamePart(weather)}{presetNamePart}{fileExtension}";
+            // Build filename with timestamp always first, then ordered fields
+            var newFilenameParts = new List<string>();
+
+            foreach (var field in cleanFieldOrder) // Use the de-duplicated cleanFieldOrder
+            {
+                switch (field)
+                {
+                    case FilenameField.Timestamp:
+                        newFilenameParts.Add(timestamp); // Timestamp is always added
+                        break;
+                    case FilenameField.CharacterName:
+                        if (config.IncludeCharacterName) newFilenameParts.Add(NamePart(character));
+                        break;
+                    case FilenameField.MapName:
+                        if (config.IncludeMapName) newFilenameParts.Add(NamePart(map));
+                        break;
+                    case FilenameField.Position:
+                        if (config.IncludePosition) newFilenameParts.Add(position); // Position already has spaces
+                        break;
+                    case FilenameField.EorzeaTime:
+                        if (config.IncludeEorzeaTime) newFilenameParts.Add(NamePart(eorzeaTime));
+                        break;
+                    case FilenameField.Weather:
+                        if (config.IncludeWeather) newFilenameParts.Add(NamePart(weather));
+                        break;
+                    case FilenameField.ShaderPreset:
+                        if (config.IncludeShaderPreset) newFilenameParts.Add(NamePart(presetNamePart));
+                        break;
+                }
+            }
+            
+            // Join parts, removing empty ones, and add extension
+            var constructedFilename = string.Join("", newFilenameParts.Where(s => !string.IsNullOrEmpty(s))) + fileExtension; // This was CS1061, now fixed by using System.Linq;
 
             // Clean up invalid characters from the filename  
             foreach (var c in Path.GetInvalidFileNameChars())
             {
-                newFilename = newFilename.Replace(c.ToString(), "");
+                constructedFilename = constructedFilename.Replace(c.ToString(), "");
             }
 
-            return Path.Combine(Path.GetDirectoryName(filePath), newFilename);
+            return Path.Combine(Path.GetDirectoryName(filePath), constructedFilename);
         }
 
         public static string NamePart(string part)

@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using Dalamud.Game.Config;
+using Dalamud.Interface.Windowing;
+using Dalamud.Game.Command;
 
 namespace Sightseeingway
 {
@@ -22,12 +24,17 @@ namespace Sightseeingway
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
+        [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
 
         private readonly List<FileSystemWatcher> fileWatchers = [];
         private readonly List<string> directoriesToMonitor = [];
         private readonly List<string> iniFilesToCheck = ["ReShade.ini", "GShade.ini"];
         private const string ShadingwayStateFileName = "shadingway.addon-state.json";
 
+        // Configuration and UI
+        public Configuration Config { get; private set; } = null!;
+        private WindowSystem windowSystem = null!;
+        private ConfigWindow configWindow = null!;
 
         // Hold the shadingway state
         public ShadingwayState? CurrentShadingwayState { get; private set; }
@@ -36,6 +43,29 @@ namespace Sightseeingway
         {
             Log.Debug("Plugin constructor started.");
             SendMessage("Plugin Initializing...");
+
+            // Load configuration
+            Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            
+            // Setup UI
+            windowSystem = new WindowSystem("Sightseeingway");
+            configWindow = new ConfigWindow(Config);
+            windowSystem.AddWindow(configWindow);
+            
+            // Register UI events
+            PluginInterface.UiBuilder.Draw += DrawUI;
+            PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
+            
+            // Register commands
+            CommandManager.AddHandler("/sightseeingway", new CommandInfo(OnCommand)
+            {
+                HelpMessage = "Opens the configuration window for Sightseeingway."
+            });
+            
+            CommandManager.AddHandler("/sway", new CommandInfo(OnCommand)
+            {
+                HelpMessage = "Opens the configuration window for Sightseeingway."
+            });
 
             Client.PrintMessage("Ready to help, friend!");
 
@@ -47,6 +77,24 @@ namespace Sightseeingway
 
             Log.Debug("Plugin constructor finished.");
             SendMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
+        }
+
+        private void OnCommand(string command, string args)
+        {
+            // Toggle config window visibility
+            configWindow.IsOpen = !configWindow.IsOpen;
+        }
+        
+        private void DrawUI()
+        {
+            // Draw the configuration UI
+            windowSystem.Draw();
+        }
+        
+        private void DrawConfigUI()
+        {
+            // Open the configuration window
+            configWindow.IsOpen = true;
         }
 
         private void SetupConfigChangeWatcher()
@@ -65,7 +113,6 @@ namespace Sightseeingway
 
         private void InitializeDirectoriesToMonitor()
         {
-
             Log.Debug("InitializeDirectoriesToMonitor started.");
 
             foreach (var watcher in fileWatchers) watcher.Dispose();
@@ -235,11 +282,22 @@ namespace Sightseeingway
             }
         }
 
-
         public void Dispose()
         {
             Log.Debug("Dispose started.");
             SendMessage("Plugin Disposing...");
+
+            // Dispose UI
+            windowSystem.RemoveAllWindows();
+            configWindow.Dispose();
+            
+            // Unregister commands
+            CommandManager.RemoveHandler("/sightseeingway");
+            CommandManager.RemoveHandler("/sway");
+            
+            // Unregister UI events
+            PluginInterface.UiBuilder.Draw -= DrawUI;
+            PluginInterface.UiBuilder.OpenConfigUi -= DrawConfigUI;
 
             foreach (var watcher in fileWatchers)
             {
