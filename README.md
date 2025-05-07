@@ -35,36 +35,42 @@ No more generic screenshot names like `ffxiv_001.png`!  Sightseeingway helps you
 
 ## How to Use
 
-Sightseeingway works automatically in the background! Simply take screenshots as you normally would in FFXIV.  When you save a screenshot, Sightseeingway will automatically rename it with the following format:
+Sightseeingway works automatically in the background! Simply take screenshots as you normally would in FFXIV.
 
-### `[Timestamp][Character][Map][Position][EorzeaTime][Weather][Extension]`
+You can customize the filename format through the Sightseeingway settings panel, accessible via the `/sightseeingway` chat command or from the Dalamud plugin settings. The panel includes a live example of the filename that updates as you change options, ensuring you see the full result.
 
-*   **Timestamp:**  `YYYYMMDDHHMMSSmil` (e.g., `20250222135356123` for February 22, 2025, 1:53:56 PM, 123 ms). Timestamps are in your local time.
-*   **Character:** Your character's name, if available (e.g., "My Character").
-*   **Map:** The name of the in-game map (e.g., "The Waking Sands").
-*   **Position:**  The coordinates on the map in the format `([X-Coordinate],[Y-Coordinate])` (e.g., "(3.5,3.6)").
-*   **EorzeaTime:** The in-game time of day when the screenshot was taken. Abbreviations are used:
-    *   `Morn` - Morning
-    *   `Aftn` - Afternoon
-    *   `Evng` - Evening
-    *   `Night` - Night
-    *   `Noon` - Noon
-    *   `Midnt` - Midnight
-    *   `GoldH` - Golden Hour
-*   **Weather:** The current weather condition in the game (e.g., "Fair Skies", "Rain", "Snow").
-*   **Extension:** The file extension of your screenshot (e.g., ".png").
+By default, screenshots will be named using the following format:
 
-**Example:**
+`[Timestamp]-[CharacterName]-[MapName]-[Position (X,Y,Z)]-[EorzeaTimePeriod]-[Weather].[Extension]`
 
-`20250225143201969-My Character-The Waking Sands (3.6,3.6)-Aftn-Fair Skies.png`
+Example: `20250506103045123-WolOfLight-LimsaLominsaUpperDecks (10.5,15.2)-Day-ClearSkies.png`
 
-This screenshot was taken on February 25, 2025, at 2:32:01 PM (local time), by the character "My Character" in "The Waking Sands" at coordinates X:3.6, Y:3.6, in the Afternoon, under Fair Skies.
+**Filename Elements:**
 
-## Planned Features (Future Development)
+*   **Timestamp:** `yyyyMMddHHmmssfff` (YearMonthDayHourMinuteSecondMillisecond)
+*   **CharacterName:** Your current character's name.
+*   **MapName:** The name of the current map or zone.
+*   **Position:** Your character's X, Y (and Z if applicable) coordinates on the map.
+*   **EorzeaTimePeriod:** The current Eorzea time period (e.g., Day, Night, Dawn, Dusk).
+*   **Weather:** The current weather in the zone.
+*   **ShaderPreset:** (Optional, requires Shadingway addon) The name of the active ReShade/GShade preset.
+*   **Extension:** `.png` or the original screenshot extension.
 
-  * **Customizable Filename Format:** Allow users to choose which elements to include in the filename and customize the order (e.g., date, time, etc.).
-  * **Option to include Region Name:** Add the region name (e.g., Thanalan) to the filename for even more location context.
-  * **Settings Panel:**  Create a Dalamud settings panel for configuration options.
+## Configuration
+
+Access the configuration window using the `/sightseeingway` chat command. Here you can:
+
+*   Enable or disable individual filename elements.
+*   Reorder the elements (Timestamp is always first).
+*   See a live preview of the filename format.
+
+## Contributing
+
+Contributions are welcome! Please feel free to fork the repository, make your changes, and submit a pull request.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE.txt). (You'll need to add a LICENSE.txt file if you choose this license).
 
 ## Contributing
 
