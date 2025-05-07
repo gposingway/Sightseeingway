@@ -112,23 +112,17 @@ namespace Sightseeingway
 
         private void UpdateTempConfigSelectedFields()
         {
-            tempConfig.SelectedFields = FieldListToString(uiOrderedFields.Where(f => uiActiveFields.Contains(f)));
+            tempConfig.SelectedFields = FilenameGenerator.FieldListToString(uiOrderedFields.Where(f => uiActiveFields.Contains(f)));
         }
 
         private List<FilenameField> StringToFieldList(string? fieldsString)
         {
-            if (string.IsNullOrEmpty(fieldsString)) return new List<FilenameField>();
-            return fieldsString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => Enum.TryParse<FilenameField>(s.Trim(), out var field) ? field : (FilenameField?)null)
-                .Where(f => f.HasValue)
-                .Select(f => f!.Value)
-                .Distinct()
-                .ToList();
+            return FilenameGenerator.StringToFieldList(fieldsString);
         }
 
         private string FieldListToString(IEnumerable<FilenameField> fieldList)
         {
-            return string.Join(",", fieldList.Select(f => f.ToString()));
+            return FilenameGenerator.FieldListToString(fieldList);
         }
 
         private void RefreshLiveExample()
@@ -136,23 +130,8 @@ namespace Sightseeingway
             lastRefreshTime = DateTime.Now;
             
             // Format timestamp according to selected format
-            string timestamp;
-            switch (tempConfig.TimestampFormat)
-            {
-                case TimestampFormat.Regular:
-                    timestamp = exampleTimestamp.ToString("yyyyMMdd-HHmmss-fff");
-                    break;
-                case TimestampFormat.Readable:
-                    timestamp = exampleTimestamp.ToString("yyyy-MM-dd_HH-mm-ss.fff");
-                    break;
-                case TimestampFormat.Compact:
-                default:
-                    timestamp = exampleTimestamp.ToString("yyyyMMddHHmmssfff");
-                    break;
-            }
+            string timestamp = FilenameGenerator.FormatTimestamp(exampleTimestamp, tempConfig.TimestampFormat);
             
-            exampleFileName = timestamp;
-
             var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "WolOfLight";
             var map = "Unknown";
             var position = "";
@@ -164,7 +143,7 @@ namespace Sightseeingway
             {
                 try
                 {
-                    var mapSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Map>();
+                    var mapSheet = Plugin.DataManager.GetExcelSheet<Map>();
                     if (mapSheet != null)
                     {
                         var mapRow = mapSheet.GetRow(Plugin.ClientState.MapId);
@@ -193,25 +172,26 @@ namespace Sightseeingway
             }
 
             var activeFieldsInOrder = StringToFieldList(tempConfig.SelectedFields);
-
-            foreach (var field in activeFieldsInOrder.Skip(1))
-            {
-                switch (field)
-                {
-                    case FilenameField.CharacterName: exampleFileName += AddNamePart(character); break;
-                    case FilenameField.MapName: exampleFileName += AddNamePart(map); break;
-                    case FilenameField.Position: exampleFileName += position; break;
-                    case FilenameField.EorzeaTime: exampleFileName += AddNamePart(eorzeaTime); break;
-                    case FilenameField.Weather: exampleFileName += AddNamePart(weather); break;
-                    case FilenameField.ShaderPreset: exampleFileName += AddNamePart(shaderPreset); break;
-                }
-            }
-            exampleFileName += ".png";
+            
+            // Use the centralized filename generation method
+            exampleFileName = FilenameGenerator.GenerateFilename(
+                exampleTimestamp,
+                tempConfig.TimestampFormat,
+                character,
+                map,
+                position,
+                eorzeaTime,
+                weather,
+                shaderPreset,
+                IO.EffectsEnabled,
+                activeFieldsInOrder,
+                ".png"
+            );
         }
         
         private string AddNamePart(string part)
         {
-            return string.IsNullOrEmpty(part) || part == "Unknown" ? "" : "-" + part;
+            return FilenameGenerator.FormatNamePart(part);
         }
         
         public override void Draw()
@@ -224,7 +204,7 @@ namespace Sightseeingway
 
             var configChanged = false;
             
-            if (ImGui.BeginChild("##MainScrollingArea", new Vector2(-1, ImGui.GetContentRegionAvail().Y - 130), true))
+            if (ImGui.BeginChild("##MainScrollingArea", new Vector2(-1, ImGui.GetContentRegionAvail().Y - 125), true))
             {
                 // Timestamp Format Section
                 ImGui.TextColored(headerColor, "Timestamp");
