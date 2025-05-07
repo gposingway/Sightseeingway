@@ -69,7 +69,7 @@ namespace Sightseeingway
                 IncludeEorzeaTime = config.IncludeEorzeaTime,
                 IncludeWeather = config.IncludeWeather,
                 IncludeShaderPreset = config.IncludeShaderPreset,
-                FieldOrder = new List<FilenameField>(config.FieldOrder)
+                FieldOrder = [.. config.FieldOrder]
             };
         }
         
@@ -257,15 +257,15 @@ namespace Sightseeingway
                 ImGui.TextColored(headerColor, "Field Selection and Order");
                 ImGui.TextWrapped("Select which fields to include and drag to reorder them. Timestamp is always first and enabled.");
                 ImGui.Spacing();
-                
+
                 // Show all fields with checkboxes and up/down buttons
                 var fields = tempConfig.FieldOrder.ToList(); // Operate on a copy for safe iteration
-                
-                for (int i = 0; i < fields.Count; i++)
+
+                for (var i = 0; i < fields.Count; i++)
                 {
                     var field = fields[i];
-                    string name = FieldDisplayNames[field];
-                    bool isTimestampField = field == FilenameField.Timestamp;
+                    var name = FieldDisplayNames[field];
+                    var isTimestampField = field == FilenameField.Timestamp;
                     
                     ImGui.PushID($"field_{i}");
                     
@@ -273,9 +273,7 @@ namespace Sightseeingway
                     ImGui.BeginDisabled(isTimestampField || i == 1); // Timestamp is at index 0, first editable is 1
                     if (ImGui.ArrowButton("##up", ImGuiDir.Up) && !isTimestampField && i > 0)
                     {
-                        var temp = tempConfig.FieldOrder[i];
-                        tempConfig.FieldOrder[i] = tempConfig.FieldOrder[i - 1];
-                        tempConfig.FieldOrder[i - 1] = temp;
+                        (tempConfig.FieldOrder[i - 1], tempConfig.FieldOrder[i]) = (tempConfig.FieldOrder[i], tempConfig.FieldOrder[i - 1]);
                         configChanged = true;
                     }
                     ImGui.EndDisabled();
@@ -286,9 +284,7 @@ namespace Sightseeingway
                     ImGui.BeginDisabled(isTimestampField || i == tempConfig.FieldOrder.Count - 1);
                     if (ImGui.ArrowButton("##down", ImGuiDir.Down) && !isTimestampField && i < tempConfig.FieldOrder.Count - 1)
                     {
-                        var temp = tempConfig.FieldOrder[i];
-                        tempConfig.FieldOrder[i] = tempConfig.FieldOrder[i + 1];
-                        tempConfig.FieldOrder[i + 1] = temp;
+                        (tempConfig.FieldOrder[i + 1], tempConfig.FieldOrder[i]) = (tempConfig.FieldOrder[i], tempConfig.FieldOrder[i + 1]);
                         configChanged = true;
                     }
                     ImGui.EndDisabled();
@@ -296,7 +292,7 @@ namespace Sightseeingway
                     ImGui.SameLine();
                     
                     // Checkbox with field name (Timestamp is always checked and disabled)
-                    bool isChecked = isTimestampField || GetFieldEnabled(field);
+                    var isChecked = isTimestampField || GetFieldEnabled(field);
                     ImGui.BeginDisabled(isTimestampField);
                     if (ImGui.Checkbox(name, ref isChecked) && !isTimestampField)
                     {
@@ -341,7 +337,7 @@ namespace Sightseeingway
             
             // Live example section (fixed at bottom)
             ImGui.Spacing();
-            ImGui.TextColored(exampleHeaderColor, "Live Example:");
+            ImGui.TextColored(exampleHeaderColor, "Example:");
             
             // Example filename display
             // Increased height from 40 to 60 to accommodate potential wrapping
@@ -354,10 +350,11 @@ namespace Sightseeingway
             ImGui.Spacing();
             
             // Action buttons
-            float windowWidth = ImGui.GetWindowWidth();
-            float buttonWidth = (windowWidth - 40) / 3;
-            
-            if (ImGui.Button("Save Settings", new Vector2(buttonWidth, 30)))
+            var windowWidth = ImGui.GetWindowWidth();
+            var buttonWidth = (windowWidth - 40) / 3;
+            float buttonHeight = 24;
+
+            if (ImGui.Button("Save Settings", new Vector2(buttonWidth, buttonHeight)))
             {
                 ApplyChanges();
                 config.Save();
@@ -367,7 +364,7 @@ namespace Sightseeingway
             
             ImGui.SameLine(0, 10);
             
-            if (ImGui.Button("Revert Changes", new Vector2(buttonWidth, 30)))
+            if (ImGui.Button("Revert Changes", new Vector2(buttonWidth, buttonHeight)))
             {
                 CopyConfigToTemp();
                 RefreshLiveExample();
@@ -376,7 +373,7 @@ namespace Sightseeingway
             
             ImGui.SameLine(0, 10);
             
-            if (ImGui.Button("Reset to Defaults", new Vector2(buttonWidth, 30)))
+            if (ImGui.Button("Reset to Defaults", new Vector2(buttonWidth, buttonHeight)))
             {
                 ResetToDefaults();
                 RefreshLiveExample();
@@ -437,7 +434,7 @@ namespace Sightseeingway
             config.IncludeEorzeaTime = tempConfig.IncludeEorzeaTime;
             config.IncludeWeather = tempConfig.IncludeWeather;
             config.IncludeShaderPreset = tempConfig.IncludeShaderPreset;
-            config.FieldOrder = new List<FilenameField>(tempConfig.FieldOrder);
+            config.FieldOrder = [.. tempConfig.FieldOrder];
         }
         
         private void ResetToDefaults()
@@ -448,9 +445,9 @@ namespace Sightseeingway
             tempConfig.IncludeEorzeaTime = true;
             tempConfig.IncludeWeather = true;
             tempConfig.IncludeShaderPreset = true;
-            
-            tempConfig.FieldOrder = new List<FilenameField>
-            {
+
+            tempConfig.FieldOrder =
+            [
                 FilenameField.Timestamp, // Ensure Timestamp is first
                 FilenameField.CharacterName,
                 FilenameField.MapName,
@@ -458,7 +455,7 @@ namespace Sightseeingway
                 FilenameField.EorzeaTime,
                 FilenameField.Weather,
                 FilenameField.ShaderPreset
-            };
+            ];
             EnsureValidFieldOrder(); // Re-validate after reset
         }
         
