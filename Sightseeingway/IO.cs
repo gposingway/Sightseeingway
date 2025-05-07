@@ -227,47 +227,53 @@ namespace Sightseeingway
             }, default, 30);
         }
 
-        public static string ResolveNewFileName(string filePath)
+        public static string? ResolveNewFileName(string filePath) // Made nullable to match return type
         {
             var fileName = Path.GetFileName(filePath);
             var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
-            
-            // Check if the filename starts with a timestamp; if so, just ignore it.
-            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), "yyyyMMddHHmmssfff", null, System.Globalization.DateTimeStyles.None, out _)) return null;
 
-            // Get configuration
+            // Check if the filename already starts with a timestamp (e.g., already processed or from another tool)
+            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), "yyyyMMddHHmmssfff", null, System.Globalization.DateTimeStyles.None, out _))
+            {
+                return null; // Indicate no rename needed
+            }
+
             var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-            
-            // Prepare a clean field order for generating the filename to prevent duplicates
-            var cleanFieldOrder = new List<FilenameField>();
-            var seenFieldsInOrder = new HashSet<FilenameField>();
 
-            // Ensure Timestamp is always first if it's in the config's order or as a default
-            if (config.FieldOrder.Contains(FilenameField.Timestamp))
+            // Parse the SelectedFields string to get active fields in order.
+            // Timestamp is implicitly always first and active.
+            var activeFieldsInOrder = config.SelectedFields.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => Enum.TryParse<FilenameField>(s.Trim(), out var field) ? field : (FilenameField?)null)
+                .Where(f => f.HasValue)
+                .Select(f => f!.Value)
+                .Distinct() // Ensure no duplicates from string
+                .ToList();
+
+            // Ensure Timestamp is first if not already, or add it if missing (though config should default it)
+            if (!activeFieldsInOrder.Any() || activeFieldsInOrder[0] != FilenameField.Timestamp)
             {
-                cleanFieldOrder.Add(FilenameField.Timestamp);
-                seenFieldsInOrder.Add(FilenameField.Timestamp);
-            } else {
-                // Fallback if Timestamp somehow missing from config.FieldOrder, though UI should prevent this.
-                cleanFieldOrder.Add(FilenameField.Timestamp);
-                seenFieldsInOrder.Add(FilenameField.Timestamp);
+                activeFieldsInOrder.Remove(FilenameField.Timestamp); // Remove if it exists elsewhere
+                activeFieldsInOrder.Insert(0, FilenameField.Timestamp); // Add to the beginning
             }
 
-            // Add unique fields from config.FieldOrder, maintaining their relative order
-            foreach (var field in config.FieldOrder)
-            {
-                if (seenFieldsInOrder.Add(field)) // .Add returns true if item was added (i.e., not seen before)
-                {
-                    cleanFieldOrder.Add(field);
-                }
-            }
-            // At this point, cleanFieldOrder contains Timestamp and unique fields from config.FieldOrder.
-            // We don't add missing enum fields here as IO should respect the configured fields.
-            // The primary goal here is to prevent duplication from a malformed config.FieldOrder.
-
-            // Get all field values upfront
             var fileCreationTime = File.GetCreationTime(filePath);
-            var timestamp = fileCreationTime.ToString("yyyyMMddHHmmssfff");
+            
+            // Format timestamp according to the user's selected format
+            string timestamp;
+            switch (config.TimestampFormat)
+            {
+                case TimestampFormat.Regular:
+                    timestamp = fileCreationTime.ToString("yyyyMMdd-HHmmss-fff");
+                    break;
+                case TimestampFormat.Readable:
+                    timestamp = fileCreationTime.ToString("yyyy-MM-dd_HH-mm-ss.fff");
+                    break;
+                case TimestampFormat.Compact:
+                default:
+                    timestamp = fileCreationTime.ToString("yyyyMMddHHmmssfff");
+                    break;
+            }
+            
             var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
             var map = "";
             var position = "";
@@ -294,7 +300,7 @@ namespace Sightseeingway
                         }
                         catch (Exception ex)
                         {
-                            Plugin.Log.Debug($"Error extracting map name: {ex.Message}");
+                            Plugin.Log.Debug($"Error extracting map name: {ex.Message}"); // Keep log for debugging
                         }
 
                         Plugin.SendMessage($"Map name resolved: {map}");
@@ -338,39 +344,41 @@ namespace Sightseeingway
                 }
             }
 
-            // Build filename with timestamp always first, then ordered fields
             var newFilenameParts = new List<string>();
 
-            foreach (var field in cleanFieldOrder) // Use the de-duplicated cleanFieldOrder
+            foreach (var field in activeFieldsInOrder) // Iterate through the active fields in their specified order
             {
                 switch (field)
                 {
                     case FilenameField.Timestamp:
-                        newFilenameParts.Add(timestamp); // Timestamp is always added
+                        newFilenameParts.Add(timestamp);
                         break;
                     case FilenameField.CharacterName:
-                        if (config.IncludeCharacterName) newFilenameParts.Add(NamePart(character));
+                        newFilenameParts.Add(NamePart(character));
                         break;
                     case FilenameField.MapName:
-                        if (config.IncludeMapName) newFilenameParts.Add(NamePart(map));
+                        newFilenameParts.Add(NamePart(map));
                         break;
                     case FilenameField.Position:
-                        if (config.IncludePosition) newFilenameParts.Add(position); // Position already has spaces
+                        newFilenameParts.Add(position); // Position already has spaces or is empty
                         break;
                     case FilenameField.EorzeaTime:
-                        if (config.IncludeEorzeaTime) newFilenameParts.Add(NamePart(eorzeaTime));
+                        newFilenameParts.Add(NamePart(eorzeaTime));
                         break;
                     case FilenameField.Weather:
-                        if (config.IncludeWeather) newFilenameParts.Add(NamePart(weather));
+                        newFilenameParts.Add(NamePart(weather));
                         break;
                     case FilenameField.ShaderPreset:
-                        if (config.IncludeShaderPreset) newFilenameParts.Add(NamePart(presetNamePart));
+                        if (EffectsEnabled) // Only add shader if effects are enabled
+                        {
+                            newFilenameParts.Add(NamePart(presetNamePart));
+                        }
                         break;
                 }
             }
-            
+
             // Join parts, removing empty ones, and add extension
-            var constructedFilename = string.Join("", newFilenameParts.Where(s => !string.IsNullOrEmpty(s))) + fileExtension; // This was CS1061, now fixed by using System.Linq;
+            var constructedFilename = string.Join("", newFilenameParts.Where(s => !string.IsNullOrEmpty(s))) + fileExtension;
 
             // Clean up invalid characters from the filename  
             foreach (var c in Path.GetInvalidFileNameChars())
@@ -378,7 +386,7 @@ namespace Sightseeingway
                 constructedFilename = constructedFilename.Replace(c.ToString(), "");
             }
 
-            return Path.Combine(Path.GetDirectoryName(filePath), constructedFilename);
+            return Path.Combine(Path.GetDirectoryName(filePath) ?? string.Empty, constructedFilename);
         }
 
         public static string NamePart(string part)
@@ -386,18 +394,18 @@ namespace Sightseeingway
             return string.IsNullOrEmpty(part) ? "" : "-" + part;
         }
 
-        private static readonly ConcurrentQueue<(string SourceNamePath, string FinalName)> renameQueue = new();
-        private static readonly Timer renameTimer = new(RenameQueuedFiles, null, Timeout.Infinite, Timeout.Infinite);
+        private static readonly ConcurrentQueue<(string SourceNamePath, string FinalName)> RenameQueue = new();
+        private static readonly Timer RenameTimer = new(RenameQueuedFiles, null, Timeout.Infinite, Timeout.Infinite);
 
         public static void QueueRenameOperation(string sourceNamePath, string finalName)
         {
-            renameQueue.Enqueue((sourceNamePath, finalName));
-            renameTimer.Change(3000, Timeout.Infinite); // Wait for 3 seconds without writes
+            RenameQueue.Enqueue((sourceNamePath, finalName));
+            RenameTimer.Change(3000, Timeout.Infinite); // Wait for 3 seconds without writes
         }
 
         private static void RenameQueuedFiles(object? state)
         {
-            while (renameQueue.TryDequeue(out var renameOperation))
+            while (RenameQueue.TryDequeue(out var renameOperation))
             {
                 if (WaitForFileReleaseGeneric(renameOperation.SourceNamePath, FileAccess.ReadWrite))
                 {

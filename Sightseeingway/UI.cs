@@ -17,7 +17,7 @@ namespace Sightseeingway
         // Define field names
         private static readonly Dictionary<FilenameField, string> FieldDisplayNames = new()
         {
-            { FilenameField.Timestamp, "Timestamp (yyyyMMddHHmmssfff)" }, // Added Timestamp
+            { FilenameField.Timestamp, "Timestamp (yyyyMMddHHmmssfff)" },
             { FilenameField.CharacterName, "Character Name" },
             { FilenameField.MapName, "Map/Zone Name" },
             { FilenameField.Position, "Position Coordinates" },
@@ -37,25 +37,35 @@ namespace Sightseeingway
         private string exampleFileName = "";
         private DateTime lastRefreshTime = DateTime.MinValue;
         private bool isFirstDraw = true; // Flag for initial refresh
+        private DateTime exampleTimestamp; // Store a fixed timestamp for examples
         
+        // Precomputed timestamp examples
+        private string compactExample = "";
+        private string regularExample = "";
+        private string readableExample = "";
+        
+        // This list holds all possible fields in the order they are displayed in the UI.
+        private List<FilenameField> uiOrderedFields = new();
+        // This set holds the fields that are currently checked (active).
+        private HashSet<FilenameField> uiActiveFields = new();
+
         public ConfigWindow(Configuration config) : base("Sightseeingway Configuration")
         {
             this.config = config;
-            
-            // Create a working copy of the configuration
             CopyConfigToTemp();
-            
-            // Set window size and flags
-            Size = new Vector2(550, 550); // Adjusted height as Advanced Format is removed
+            Size = new Vector2(550, 600); // Increased height to accommodate new options
             SizeCondition = ImGuiCond.FirstUseEver;
             Flags = ImGuiWindowFlags.NoCollapse;
+            InitializeUIData();
+            exampleFileName = "Loading example...";
             
-            // Ensure field order has no duplicates
-            EnsureValidFieldOrder();
+            // Set a fixed timestamp for examples
+            exampleTimestamp = DateTime.Now;
             
-            // DO NOT call RefreshLiveExample() here directly
-            // exampleFileName will be initialized on first draw
-            exampleFileName = "Loading example..."; 
+            // Precompute timestamp examples
+            compactExample = exampleTimestamp.ToString("yyyyMMddHHmmssfff");
+            regularExample = exampleTimestamp.ToString("yyyyMMdd-HHmmss-fff");
+            readableExample = exampleTimestamp.ToString("yyyy-MM-dd_HH-mm-ss.fff");
         }
         
         private void CopyConfigToTemp()
@@ -63,174 +73,139 @@ namespace Sightseeingway
             tempConfig = new Configuration
             {
                 Version = config.Version,
-                IncludeCharacterName = config.IncludeCharacterName,
-                IncludeMapName = config.IncludeMapName,
-                IncludePosition = config.IncludePosition,
-                IncludeEorzeaTime = config.IncludeEorzeaTime,
-                IncludeWeather = config.IncludeWeather,
-                IncludeShaderPreset = config.IncludeShaderPreset,
-                FieldOrder = [.. config.FieldOrder]
+                SelectedFields = config.SelectedFields,
+                TimestampFormat = config.TimestampFormat
             };
         }
-        
-        private void EnsureValidFieldOrder()
+
+        private void InitializeUIData()
         {
-            var currentOrder = tempConfig.FieldOrder.ToList(); // Make a copy to iterate over
-            var newOrder = new List<FilenameField>();
-            var processedFields = new HashSet<FilenameField>();
+            // 1. Initialize uiOrderedFields
+            var configuredFields = StringToFieldList(tempConfig.SelectedFields);
+            uiOrderedFields = new List<FilenameField> { FilenameField.Timestamp }; // Timestamp always first
 
-            // 1. Add Timestamp first and mark it as processed.
-            newOrder.Add(FilenameField.Timestamp);
-            processedFields.Add(FilenameField.Timestamp);
-
-            // 2. Add unique fields from the current configuration's order,
-            //    maintaining their relative sequence after Timestamp.
-            foreach (var field in currentOrder)
+            // Add fields from current config, ensuring no duplicates and Timestamp is not re-added
+            foreach (var field in configuredFields)
             {
-                if (field != FilenameField.Timestamp && processedFields.Add(field))
+                if (field != FilenameField.Timestamp && !uiOrderedFields.Contains(field))
                 {
-                    newOrder.Add(field);
+                    uiOrderedFields.Add(field);
                 }
             }
 
-            // 3. Add any remaining FilenameField enum members that were not in the
-            //    original list, placing them at the end. This ensures all possible
-            //    fields are always represented in the order list.
-            var allPossibleFields = Enum.GetValues(typeof(FilenameField)).Cast<FilenameField>();
-            foreach (var fieldEnumMember in allPossibleFields)
+            // Add any missing fields from the enum to the end of uiOrderedFields
+            foreach (var fieldEnumMember in Enum.GetValues(typeof(FilenameField)).Cast<FilenameField>())
             {
-                if (fieldEnumMember != FilenameField.Timestamp && !processedFields.Contains(fieldEnumMember))
+                if (!uiOrderedFields.Contains(fieldEnumMember))
                 {
-                    newOrder.Add(fieldEnumMember);
-                    // No need to add to processedFields here as we're at the end of this logic block.
+                    uiOrderedFields.Add(fieldEnumMember);
                 }
             }
 
-            // 4. Update tempConfig.FieldOrder with the fully cleaned and complete list.
-            tempConfig.FieldOrder = newOrder;
+            // 2. Initialize uiActiveFields based on tempConfig.SelectedFields
+            uiActiveFields = StringToFieldList(tempConfig.SelectedFields).ToHashSet();
+            uiActiveFields.Add(FilenameField.Timestamp); // Ensure Timestamp is active
+
+            // 3. Synchronize tempConfig.SelectedFields based on the initialized uiOrderedFields and uiActiveFields
+            UpdateTempConfigSelectedFields();
         }
-        
+
+        private void UpdateTempConfigSelectedFields()
+        {
+            tempConfig.SelectedFields = FieldListToString(uiOrderedFields.Where(f => uiActiveFields.Contains(f)));
+        }
+
+        private List<FilenameField> StringToFieldList(string? fieldsString)
+        {
+            if (string.IsNullOrEmpty(fieldsString)) return new List<FilenameField>();
+            return fieldsString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
+                .Select(s => Enum.TryParse<FilenameField>(s.Trim(), out var field) ? field : (FilenameField?)null)
+                .Where(f => f.HasValue)
+                .Select(f => f!.Value)
+                .Distinct()
+                .ToList();
+        }
+
+        private string FieldListToString(IEnumerable<FilenameField> fieldList)
+        {
+            return string.Join(",", fieldList.Select(f => f.ToString()));
+        }
+
         private void RefreshLiveExample()
         {
             lastRefreshTime = DateTime.Now;
             
-            // Start with timestamp (always required)
-            var timestamp = DateTime.Now.ToString("yyyyMMddHHmmssfff");
-            exampleFileName = timestamp;
+            // Format timestamp according to selected format
+            string timestamp;
+            switch (tempConfig.TimestampFormat)
+            {
+                case TimestampFormat.Regular:
+                    timestamp = exampleTimestamp.ToString("yyyyMMdd-HHmmss-fff");
+                    break;
+                case TimestampFormat.Readable:
+                    timestamp = exampleTimestamp.ToString("yyyy-MM-dd_HH-mm-ss.fff");
+                    break;
+                case TimestampFormat.Compact:
+                default:
+                    timestamp = exampleTimestamp.ToString("yyyyMMddHHmmssfff");
+                    break;
+            }
             
-            // Get real values from the game client
+            exampleFileName = timestamp;
+
             var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "WolOfLight";
             var map = "Unknown";
             var position = "";
             var eorzeaTime = "";
             var weather = "";
             var shaderPreset = IO.CurrentPresetName ?? "Unknown";
-            
-            // Try to get location info if player is in a map
+
             if (Plugin.ClientState.LocalPlayer != null && Plugin.ClientState.MapId > 0)
             {
                 try
                 {
-                    // Get map name
-                    try
+                    var mapSheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Map>();
+                    if (mapSheet != null)
                     {
-                        var mapSheet = Plugin.DataManager.GetExcelSheet<Map>();
-                        if (mapSheet != null)
+                        var mapRow = mapSheet.GetRow(Plugin.ClientState.MapId);
+                        if (mapRow.RowId > 0) 
                         {
-                            var mapRow = mapSheet.GetRow(Plugin.ClientState.MapId);
-                            if (mapRow.RowId > 0) // Check if valid row
-                            {
-                                // Get place name carefully
-                                try
-                                {
-                                    var placeName = mapRow.PlaceName.Value;
-                                    var extractedName = placeName.Name.ToString();
-                                    if (!string.IsNullOrEmpty(extractedName))
-                                    {
-                                        map = extractedName;
-                                    }
-                                }
-                                catch (Exception ex)
-                                {
-                                    Plugin.Log.Debug($"Error extracting map name: {ex.Message}");
-                                }
-                                
-                                // Calculate player coordinates
-                                try
-                                {
-                                    var playerPos = Plugin.ClientState.LocalPlayer.Position;
-                                    var mapCoords = MapUtil.WorldToMap(playerPos, mapRow.OffsetX, mapRow.OffsetY, 0, mapRow.SizeFactor);
-                                    
-                                    // Round to one decimal place (matching IO.cs logic)
-                                    var roundedCoords = new Vector3(
-                                        (int)MathF.Round(mapCoords.X * 10f, 1) / 10f,
-                                        (int)MathF.Round(mapCoords.Y * 10f, 1) / 10f,
-                                        (int)MathF.Round(mapCoords.Z * 10f, 1) / 10f
-                                    );
-                                    
-                                    // Format position string
-                                    position = roundedCoords.Z == 0 ? 
-                                        $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0})" : 
-                                        $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0},{roundedCoords.Z:0.0})";
-                                }
-                                catch (Exception ex)
-                                {
-                                    Plugin.Log.Debug($"Error calculating coordinates: {ex.Message}");
-                                }
-                            }
+                            var placeName = mapRow.PlaceName.Value;
+                            var extractedName = placeName.Name.ToString() ?? string.Empty;
+                            if (!string.IsNullOrEmpty(extractedName)) map = extractedName;
+
+                            var playerPos = Plugin.ClientState.LocalPlayer.Position;
+                            var mapCoords = MapUtil.WorldToMap(playerPos, mapRow.OffsetX, mapRow.OffsetY, 0, mapRow.SizeFactor);
+                            var roundedCoords = new Vector3(
+                                (int)MathF.Round(mapCoords.X * 10f, 1) / 10f,
+                                (int)MathF.Round(mapCoords.Y * 10f, 1) / 10f,
+                                (int)MathF.Round(mapCoords.Z * 10f, 1) / 10f
+                            );
+                            position = roundedCoords.Z == 0 ?
+                                $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0})" :
+                                $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0},{roundedCoords.Z:0.0})";
                         }
                     }
-                    catch (Exception ex)
-                    {
-                        Plugin.Log.Debug($"Error getting map name: {ex.Message}");
-                    }
-                    
-                    // Get current weather and Eorzea time
-                    try
-                    {
-                        weather = Client.GetCurrentWeatherName();
-                        eorzeaTime = Client.GetCurrentEorzeaDateTime().DetermineDayPeriod(true);
-                    }
-                    catch (Exception ex)
-                    {
-                        Plugin.Log.Debug($"Error getting weather or time: {ex.Message}");
-                        weather = "Clear Skies";
-                        eorzeaTime = "Day";
-                    }
+                    weather = Client.GetCurrentWeatherName();
+                    eorzeaTime = Client.GetCurrentEorzeaDateTime().DetermineDayPeriod(true);
                 }
-                catch (Exception ex)
-                {
-                    Plugin.Log.Warning($"Error getting map data: {ex.Message}");
-                }
+                catch (Exception ex) { Plugin.Log.Warning($"Error getting game data for example: {ex.Message}"); }
             }
-            
-            // Build the filename based on field order
-            foreach (var field in tempConfig.FieldOrder)
+
+            var activeFieldsInOrder = StringToFieldList(tempConfig.SelectedFields);
+
+            foreach (var field in activeFieldsInOrder.Skip(1))
             {
                 switch (field)
                 {
-                    case FilenameField.CharacterName:
-                        if (tempConfig.IncludeCharacterName) exampleFileName += AddNamePart(character);
-                        break;
-                    case FilenameField.MapName:
-                        if (tempConfig.IncludeMapName) exampleFileName += AddNamePart(map);
-                        break;
-                    case FilenameField.Position:
-                        if (tempConfig.IncludePosition) exampleFileName += position;
-                        break;
-                    case FilenameField.EorzeaTime:
-                        if (tempConfig.IncludeEorzeaTime) exampleFileName += AddNamePart(eorzeaTime);
-                        break;
-                    case FilenameField.Weather:
-                        if (tempConfig.IncludeWeather) exampleFileName += AddNamePart(weather);
-                        break;
-                    case FilenameField.ShaderPreset:
-                        if (tempConfig.IncludeShaderPreset) exampleFileName += AddNamePart(shaderPreset);
-                        break;
+                    case FilenameField.CharacterName: exampleFileName += AddNamePart(character); break;
+                    case FilenameField.MapName: exampleFileName += AddNamePart(map); break;
+                    case FilenameField.Position: exampleFileName += position; break;
+                    case FilenameField.EorzeaTime: exampleFileName += AddNamePart(eorzeaTime); break;
+                    case FilenameField.Weather: exampleFileName += AddNamePart(weather); break;
+                    case FilenameField.ShaderPreset: exampleFileName += AddNamePart(shaderPreset); break;
                 }
             }
-            
-            // Add extension
             exampleFileName += ".png";
         }
         
@@ -249,59 +224,87 @@ namespace Sightseeingway
 
             var configChanged = false;
             
-            // Main content area (scrollable)
-            // Adjusted the subtraction from 100 to 140 to reserve more space for bottom elements
             if (ImGui.BeginChild("##MainScrollingArea", new Vector2(-1, ImGui.GetContentRegionAvail().Y - 130), true))
             {
-                // Field selection and ordering
+                // Timestamp Format Section
+                ImGui.TextColored(headerColor, "Timestamp Format");
+                ImGui.Spacing();
+                
+                string[] timestampOptions = { "Compact (yyyyMMddHHmmssfff)", "Regular (yyyyMMdd-HHmmss-fff)", "Readable (yyyy-MM-dd_HH-mm-ss.fff)" };
+                int currentFormat = (int)tempConfig.TimestampFormat;
+                if (ImGui.Combo("Timestamp Format", ref currentFormat, timestampOptions, timestampOptions.Length))
+                {
+                    tempConfig.TimestampFormat = (TimestampFormat)currentFormat;
+                    configChanged = true;
+                }
+                
+                // Generate timestamp examples using the fixed timestamp
+                ImGui.TextWrapped("Example timestamps:");
+                ImGui.TextColored(exampleColor, "Compact: " + compactExample);
+                ImGui.TextColored(exampleColor, "Regular: " + regularExample);
+                ImGui.TextColored(exampleColor, "Readable: " + readableExample);
+                
+                ImGui.Spacing();
+                ImGui.Separator();
+                ImGui.Spacing();
+                
+                // Field Selection Section
                 ImGui.TextColored(headerColor, "Field Selection and Order");
                 ImGui.TextWrapped("Select which fields to include and drag to reorder them. Timestamp is always first and enabled.");
                 ImGui.Spacing();
 
-                // Show all fields with checkboxes and up/down buttons
-                var fields = tempConfig.FieldOrder.ToList(); // Operate on a copy for safe iteration
-
-                for (var i = 0; i < fields.Count; i++)
+                for (var i = 0; i < uiOrderedFields.Count; i++)
                 {
-                    var field = fields[i];
+                    var field = uiOrderedFields[i];
                     var name = FieldDisplayNames[field];
                     var isTimestampField = field == FilenameField.Timestamp;
-                    
-                    ImGui.PushID($"field_{i}");
-                    
-                    // Up button (disabled for Timestamp or if it's the first editable item)
-                    ImGui.BeginDisabled(isTimestampField || i == 1); // Timestamp is at index 0, first editable is 1
-                    if (ImGui.ArrowButton("##up", ImGuiDir.Up) && !isTimestampField && i > 0)
+
+                    ImGui.PushID($"field_{(int)field}");
+
+                    ImGui.BeginDisabled(isTimestampField || i == 0);
+                    if (ImGui.ArrowButton("##up", ImGuiDir.Up))
                     {
-                        (tempConfig.FieldOrder[i - 1], tempConfig.FieldOrder[i]) = (tempConfig.FieldOrder[i], tempConfig.FieldOrder[i - 1]);
-                        configChanged = true;
+                        if (i > 0)
+                        {
+                            var itemToMove = uiOrderedFields[i];
+                            uiOrderedFields.RemoveAt(i);
+                            uiOrderedFields.Insert(i - 1, itemToMove);
+                            UpdateTempConfigSelectedFields();
+                            configChanged = true;
+                        }
                     }
                     ImGui.EndDisabled();
-                    
+
                     ImGui.SameLine();
-                    
-                    // Down button (disabled for Timestamp or if it's the last item)
-                    ImGui.BeginDisabled(isTimestampField || i == tempConfig.FieldOrder.Count - 1);
-                    if (ImGui.ArrowButton("##down", ImGuiDir.Down) && !isTimestampField && i < tempConfig.FieldOrder.Count - 1)
+
+                    ImGui.BeginDisabled(isTimestampField || i == uiOrderedFields.Count - 1);
+                    if (ImGui.ArrowButton("##down", ImGuiDir.Down))
                     {
-                        (tempConfig.FieldOrder[i + 1], tempConfig.FieldOrder[i]) = (tempConfig.FieldOrder[i], tempConfig.FieldOrder[i + 1]);
-                        configChanged = true;
+                        if (i < uiOrderedFields.Count - 1)
+                        {
+                            var itemToMove = uiOrderedFields[i];
+                            uiOrderedFields.RemoveAt(i);
+                            uiOrderedFields.Insert(i + 1, itemToMove);
+                            UpdateTempConfigSelectedFields();
+                            configChanged = true;
+                        }
                     }
                     ImGui.EndDisabled();
-                    
+
                     ImGui.SameLine();
-                    
-                    // Checkbox with field name (Timestamp is always checked and disabled)
-                    var isChecked = isTimestampField || GetFieldEnabled(field);
-                    ImGui.BeginDisabled(isTimestampField);
-                    if (ImGui.Checkbox(name, ref isChecked) && !isTimestampField)
+
+                    var isChecked = uiActiveFields.Contains(field);
+                    ImGui.BeginDisabled(isTimestampField); // Timestamp checkbox is always checked and disabled
+                    if (ImGui.Checkbox(name, ref isChecked))
                     {
-                        SetFieldEnabled(field, isChecked);
+                        if (isChecked) uiActiveFields.Add(field);
+                        else uiActiveFields.Remove(field);
+                        UpdateTempConfigSelectedFields(); // Rebuild SelectedFields string
                         configChanged = true;
                     }
                     ImGui.EndDisabled();
-                    
-                    // Special note for Shader Preset field
+
+                    // Re-add Shadingway link and tooltip for ShaderPreset field
                     if (field == FilenameField.ShaderPreset)
                     {
                         ImGui.SameLine();
@@ -314,9 +317,8 @@ namespace Sightseeingway
                             ImGui.EndTooltip();
                         }
                         ImGui.SameLine();
-                        ImGui.TextColored(infoColor, "- Requires ");
+                        ImGui.Text("- Requires ");
                         ImGui.SameLine(0,0);
-                        // Change from SmallButton to a Text-based link
                         var linkColor = new Vector4(0.6f, 0.8f, 1.0f, 1.0f); // A typical link color (light blue)
                         ImGui.PushStyleColor(ImGuiCol.Text, linkColor);
                         ImGui.TextUnformatted("Shadingway ReShade addon");
@@ -330,17 +332,15 @@ namespace Sightseeingway
                             Util.OpenLink("https://github.com/gposingway/shadingway");
                         }
                     }
+
                     ImGui.PopID();
                 }
                 ImGui.EndChild();
             }
             
-            // Live example section (fixed at bottom)
             ImGui.Spacing();
             ImGui.TextColored(exampleHeaderColor, "Example:");
             
-            // Example filename display
-            // Increased height from 40 to 60 to accommodate potential wrapping
             ImGui.BeginChild("##ExampleBox", new Vector2(-1, 60), true); 
             ImGui.PushStyleColor(ImGuiCol.Text, exampleColor);
             ImGui.TextWrapped(exampleFileName);
@@ -349,7 +349,6 @@ namespace Sightseeingway
             
             ImGui.Spacing();
             
-            // Action buttons
             var windowWidth = ImGui.GetWindowWidth();
             var buttonWidth = (windowWidth - 40) / 3;
             float buttonHeight = 24;
@@ -359,7 +358,7 @@ namespace Sightseeingway
                 ApplyChanges();
                 config.Save();
                 Client.PrintMessage("Settings saved successfully!");
-                this.IsOpen = false; // Close the window after saving
+                this.IsOpen = false;
             }
             
             ImGui.SameLine(0, 10);
@@ -367,6 +366,7 @@ namespace Sightseeingway
             if (ImGui.Button("Revert Changes", new Vector2(buttonWidth, buttonHeight)))
             {
                 CopyConfigToTemp();
+                InitializeUIData();
                 RefreshLiveExample();
                 Client.PrintMessage("Changes reverted to last saved settings.");
             }
@@ -380,83 +380,24 @@ namespace Sightseeingway
                 Client.PrintMessage("Settings reset to defaults.");
             }
             
-            // Update example if config changed
             if (configChanged)
             {
                 RefreshLiveExample();
             }
         }
         
-        private bool GetFieldEnabled(FilenameField field)
-        {
-            return field switch
-            {
-                FilenameField.CharacterName => tempConfig.IncludeCharacterName,
-                FilenameField.MapName => tempConfig.IncludeMapName,
-                FilenameField.Position => tempConfig.IncludePosition,
-                FilenameField.EorzeaTime => tempConfig.IncludeEorzeaTime,
-                FilenameField.Weather => tempConfig.IncludeWeather,
-                FilenameField.ShaderPreset => tempConfig.IncludeShaderPreset,
-                _ => false
-            };
-        }
-        
-        private void SetFieldEnabled(FilenameField field, bool enabled)
-        {
-            switch (field)
-            {
-                case FilenameField.CharacterName:
-                    tempConfig.IncludeCharacterName = enabled;
-                    break;
-                case FilenameField.MapName:
-                    tempConfig.IncludeMapName = enabled;
-                    break;
-                case FilenameField.Position:
-                    tempConfig.IncludePosition = enabled;
-                    break;
-                case FilenameField.EorzeaTime:
-                    tempConfig.IncludeEorzeaTime = enabled;
-                    break;
-                case FilenameField.Weather:
-                    tempConfig.IncludeWeather = enabled;
-                    break;
-                case FilenameField.ShaderPreset:
-                    tempConfig.IncludeShaderPreset = enabled;
-                    break;
-            }
-        }
-        
         private void ApplyChanges()
         {
-            config.IncludeCharacterName = tempConfig.IncludeCharacterName;
-            config.IncludeMapName = tempConfig.IncludeMapName;
-            config.IncludePosition = tempConfig.IncludePosition;
-            config.IncludeEorzeaTime = tempConfig.IncludeEorzeaTime;
-            config.IncludeWeather = tempConfig.IncludeWeather;
-            config.IncludeShaderPreset = tempConfig.IncludeShaderPreset;
-            config.FieldOrder = [.. tempConfig.FieldOrder];
+            UpdateTempConfigSelectedFields();
+            config.SelectedFields = tempConfig.SelectedFields;
+            config.TimestampFormat = tempConfig.TimestampFormat;
         }
         
         private void ResetToDefaults()
         {
-            tempConfig.IncludeCharacterName = true;
-            tempConfig.IncludeMapName = true;
-            tempConfig.IncludePosition = true;
-            tempConfig.IncludeEorzeaTime = true;
-            tempConfig.IncludeWeather = true;
-            tempConfig.IncludeShaderPreset = true;
-
-            tempConfig.FieldOrder =
-            [
-                FilenameField.Timestamp, // Ensure Timestamp is first
-                FilenameField.CharacterName,
-                FilenameField.MapName,
-                FilenameField.Position,
-                FilenameField.EorzeaTime,
-                FilenameField.Weather,
-                FilenameField.ShaderPreset
-            ];
-            EnsureValidFieldOrder(); // Re-validate after reset
+            tempConfig.SelectedFields = Configuration.GetDefaultSelectedFields();
+            tempConfig.TimestampFormat = TimestampFormat.Compact;
+            InitializeUIData();
         }
         
         public void Dispose() { }
