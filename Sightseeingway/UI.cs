@@ -53,7 +53,7 @@ namespace Sightseeingway
         {
             this.config = config;
             CopyConfigToTemp();
-            Size = new Vector2(550, 600); // Increased height to accommodate new options
+            Size = new Vector2(550, 600);
             SizeCondition = ImGuiCond.FirstUseEver;
             Flags = ImGuiWindowFlags.NoCollapse;
             InitializeUIData();
@@ -62,10 +62,10 @@ namespace Sightseeingway
             // Set a fixed timestamp for examples
             exampleTimestamp = DateTime.Now;
             
-            // Precompute timestamp examples
-            compactExample = exampleTimestamp.ToString("yyyyMMddHHmmssfff");
-            regularExample = exampleTimestamp.ToString("yyyyMMdd-HHmmss-fff");
-            readableExample = exampleTimestamp.ToString("yyyy-MM-dd_HH-mm-ss.fff");
+            // Precompute timestamp examples using FilenameGenerator
+            compactExample = FilenameGenerator.FormatTimestamp(exampleTimestamp, TimestampFormat.Compact);
+            regularExample = FilenameGenerator.FormatTimestamp(exampleTimestamp, TimestampFormat.Regular);
+            readableExample = FilenameGenerator.FormatTimestamp(exampleTimestamp, TimestampFormat.Readable);
         }
         
         private void CopyConfigToTemp()
@@ -118,11 +118,6 @@ namespace Sightseeingway
         private List<FilenameField> StringToFieldList(string? fieldsString)
         {
             return FilenameGenerator.StringToFieldList(fieldsString);
-        }
-
-        private string FieldListToString(IEnumerable<FilenameField> fieldList)
-        {
-            return FilenameGenerator.FieldListToString(fieldList);
         }
 
         private void RefreshLiveExample()
@@ -187,11 +182,6 @@ namespace Sightseeingway
                 activeFieldsInOrder,
                 ".png"
             );
-        }
-        
-        private string AddNamePart(string part)
-        {
-            return FilenameGenerator.FormatNamePart(part);
         }
         
         public override void Draw()
