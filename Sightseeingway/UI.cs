@@ -17,7 +17,7 @@ namespace Sightseeingway
         // Define field names
         private static readonly Dictionary<FilenameField, string> FieldDisplayNames = new()
         {
-            { FilenameField.Timestamp, "Timestamp (yyyyMMddHHmmssfff)" },
+            { FilenameField.Timestamp, "Timestamp" },
             { FilenameField.CharacterName, "Character Name" },
             { FilenameField.MapName, "Map/Zone Name" },
             { FilenameField.Position, "Position Coordinates" },
@@ -227,19 +227,19 @@ namespace Sightseeingway
             if (ImGui.BeginChild("##MainScrollingArea", new Vector2(-1, ImGui.GetContentRegionAvail().Y - 130), true))
             {
                 // Timestamp Format Section
-                ImGui.TextColored(headerColor, "Timestamp Format");
+                ImGui.TextColored(headerColor, "Timestamp");
                 ImGui.Spacing();
                 
                 string[] timestampOptions = { "Compact (yyyyMMddHHmmssfff)", "Regular (yyyyMMdd-HHmmss-fff)", "Readable (yyyy-MM-dd_HH-mm-ss.fff)" };
                 int currentFormat = (int)tempConfig.TimestampFormat;
-                if (ImGui.Combo("Timestamp Format", ref currentFormat, timestampOptions, timestampOptions.Length))
+                if (ImGui.Combo("Format", ref currentFormat, timestampOptions, timestampOptions.Length))
                 {
                     tempConfig.TimestampFormat = (TimestampFormat)currentFormat;
                     configChanged = true;
                 }
                 
                 // Generate timestamp examples using the fixed timestamp
-                ImGui.TextWrapped("Example timestamps:");
+                ImGui.TextWrapped("Examples:");
                 ImGui.TextColored(exampleColor, "Compact: " + compactExample);
                 ImGui.TextColored(exampleColor, "Regular: " + regularExample);
                 ImGui.TextColored(exampleColor, "Readable: " + readableExample);
@@ -250,7 +250,7 @@ namespace Sightseeingway
                 
                 // Field Selection Section
                 ImGui.TextColored(headerColor, "Field Selection and Order");
-                ImGui.TextWrapped("Select which fields to include and drag to reorder them. Timestamp is always first and enabled.");
+                ImGui.TextWrapped("Select which fields to include and the order they'll be used.");
                 ImGui.Spacing();
 
                 for (var i = 0; i < uiOrderedFields.Count; i++)
@@ -261,10 +261,11 @@ namespace Sightseeingway
 
                     ImGui.PushID($"field_{(int)field}");
 
-                    ImGui.BeginDisabled(isTimestampField || i == 0);
+                    // Fix bug: Need to disable up arrow for the item immediately after Timestamp
+                    ImGui.BeginDisabled(isTimestampField || i <= 1); // Changed from "i == 0" to "i <= 1"
                     if (ImGui.ArrowButton("##up", ImGuiDir.Up))
                     {
-                        if (i > 0)
+                        if (i > 1) // Changed from "i > 0" to "i > 1" to ensure second item can't swap with Timestamp
                         {
                             var itemToMove = uiOrderedFields[i];
                             uiOrderedFields.RemoveAt(i);
