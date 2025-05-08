@@ -17,6 +17,9 @@ namespace Sightseeingway
 
         // The format to use for timestamps in filenames
         public TimestampFormat TimestampFormat { get; set; } = TimestampFormat.Compact;
+        
+        // Debug Mode toggle
+        public bool DebugMode { get; set; } = false;
 
         public static string GetDefaultSelectedFields() =>
             string.Join(",", Enum.GetValues(typeof(FilenameField)).Cast<FilenameField>().Select(f => f.ToString()));

@@ -14,12 +14,12 @@ namespace Sightseeingway
             if (RenamedFilesCache.ContainsKey(filename))
             {
                 RenamedFilesCache[filename] = DateTime.Now;
-                Plugin.Log.Debug($"Filename cache updated for '{filename}'.");
+                Plugin.Logger?.Debug($"Filename cache updated for '{filename}'.");
             }
             else
             {
                 RenamedFilesCache.Add(filename, DateTime.Now);
-                Plugin.Log.Debug($"Filename '{filename}' added to rename cache.");
+                Plugin.Logger?.Debug($"Filename '{filename}' added to rename cache.");
             }
             CleanRenameCache();
         }
@@ -28,7 +28,7 @@ namespace Sightseeingway
         {
             if (RenamedFilesCache.ContainsKey(filename))
             {
-                Plugin.Log.Debug($"Filename '{filename}' found in rename cache.");
+                Plugin.Logger?.Debug($"Filename '{filename}' found in rename cache.");
                 return true;
             }
             return false;
@@ -39,11 +39,11 @@ namespace Sightseeingway
             var expiredKeys = RenamedFilesCache.Keys.Where(key => DateTime.Now - RenamedFilesCache[key] > CacheDuration).ToList();
             if (expiredKeys.Any())
             {
-                Plugin.Log.Debug($"Cleaning {expiredKeys.Count} expired items from rename cache.");
+                Plugin.Logger?.Debug($"Cleaning {expiredKeys.Count} expired items from rename cache.");
                 foreach (var key in expiredKeys)
                 {
                     RenamedFilesCache.Remove(key);
-                    Plugin.Log.Debug($"Expired filename '{key}' removed from cache.");
+                    Plugin.Logger?.Debug($"Expired filename '{key}' removed from cache.");
                 }
             }
         }

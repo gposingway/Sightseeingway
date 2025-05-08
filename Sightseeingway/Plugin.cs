@@ -8,12 +8,14 @@ using System.Diagnostics;
 using Dalamud.Game.Config;
 using Dalamud.Interface.Windowing;
 using Dalamud.Game.Command;
+using Sightseeingway.Services;
+using Sightseeingway.Results;
 
 namespace Sightseeingway
 {
     public sealed class Plugin : IDalamudPlugin
     {
-        // Static debug flag
+        // Static debug flag - will be initialized from config
         public static bool DebugMode = false;
 
         [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
@@ -26,63 +28,137 @@ namespace Sightseeingway
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
         [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
 
+        // The unified logger service
+        public static Logger? Logger { get; private set; } = null;
+
         private readonly List<FileSystemWatcher> fileWatchers = [];
         private readonly List<string> directoriesToMonitor = [];
-        private readonly List<string> iniFilesToCheck = ["ReShade.ini", "GShade.ini"];
-        private const string ShadingwayStateFileName = "shadingway.addon-state.json";
 
         // Configuration and UI
         public Configuration Config { get; private set; } = null!;
         private WindowSystem windowSystem = null!;
-        private ConfigWindow configWindow = null!;
+        private ConfigWindow? configWindow = null;
 
         // Hold the shadingway state
         public ShadingwayState? CurrentShadingwayState { get; private set; }
 
         public Plugin()
         {
-            Log.Debug("Plugin constructor started.");
-            SendMessage("Plugin Initializing...");
-
-            // Load configuration
-            Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-            
-            // Setup UI
-            windowSystem = new WindowSystem("Sightseeingway");
-            configWindow = new ConfigWindow(Config);
-            windowSystem.AddWindow(configWindow);
-            
-            // Register UI events
-            PluginInterface.UiBuilder.Draw += DrawUI;
-            PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
-            
-            // Register commands
-            CommandManager.AddHandler("/sightseeingway", new CommandInfo(OnCommand)
+            try
             {
-                HelpMessage = "Opens the configuration window for Sightseeingway."
-            });
-            
-            CommandManager.AddHandler("/sway", new CommandInfo(OnCommand)
+                // IMPORTANT: Initialize all dependencies BEFORE creating the Logger
+                Log?.Debug("Plugin constructor started.");
+                
+                // Load configuration first
+                Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+                
+                // Set debug mode from configuration
+                DebugMode = Config.DebugMode;
+                
+                // Setup UI system first, before creating any windows
+                windowSystem = new WindowSystem(Constants.Plugin.Name);
+                
+                // NOW initialize the Logger after basic services are ready
+                Logger = new Logger(Log, ChatGui, DebugMode);
+                
+                // After Logger is ready, we can use it safely
+                Logger.Debug("Logger initialized, continuing with plugin setup.");
+                
+                // Now create the config window (which uses Logger)
+                configWindow = new ConfigWindow(Config);
+                windowSystem.AddWindow(configWindow);
+                
+                // Register UI events
+                PluginInterface.UiBuilder.Draw += DrawUI;
+                PluginInterface.UiBuilder.OpenConfigUi += DrawConfigUI;
+                
+                // Register commands
+                CommandManager.AddHandler(Constants.Plugin.Command, new CommandInfo(OnCommand)
+                {
+                    HelpMessage = Constants.Plugin.HelpMessage
+                });
+                
+                CommandManager.AddHandler(Constants.Plugin.ShortCommand, new CommandInfo(OnCommand)
+                {
+                    HelpMessage = Constants.Plugin.HelpMessage
+                });
+
+                // Now it's safe to use PrintMessage
+                SafeUserMessage("Ready to help, friend!");
+
+                InitializeDirectoriesToMonitor();
+                IO.SetupWatchers(directoriesToMonitor, fileWatchers);
+                SetupShadingwayWatcher();
+
+                SetupConfigChangeWatcher();
+
+                Logger.Debug("Plugin constructor finished.");
+            }
+            catch (Exception ex)
             {
-                HelpMessage = "Opens the configuration window for Sightseeingway."
-            });
+                // Last resort error handling
+                Log?.Error($"Critical error during plugin initialization: {ex}");
+                if (ChatGui != null)
+                {
+                    try
+                    {
+                        ChatGui.PrintError($"[Sightseeingway] Critical error during initialization: {ex.Message}");
+                    }
+                    catch
+                    {
+                        // Nothing we can do if even this fails
+                    }
+                }
+            }
+        }
 
-            Client.PrintMessage("Ready to help, friend!");
-
-            InitializeDirectoriesToMonitor();
-            IO.SetupWatchers(directoriesToMonitor, fileWatchers);
-            SetupShadingwayWatcher();
-
-            SetupConfigChangeWatcher();
-
-            Log.Debug("Plugin constructor finished.");
-            SendMessage("Plugin Initialized. Monitoring screenshot folders with filename caching.");
+        // Safe method to show messages to users even during initialization
+        private void SafeUserMessage(string message)
+        {
+            try
+            {
+                if (Logger != null)
+                {
+                    Logger.UserMessage(message);
+                }
+                else if (ChatGui != null)
+                {
+                    ChatGui.Print($"[Sightseeingway] {message}");
+                }
+            }
+            catch
+            {
+                // Silently fail if we can't log during startup
+            }
         }
 
         private void OnCommand(string command, string args)
         {
-            // Toggle config window visibility
-            configWindow.IsOpen = !configWindow.IsOpen;
+            // Handle args for debug mode if specified
+            if (!string.IsNullOrWhiteSpace(args))
+            {
+                var argsParts = args.Trim().Split(' ');
+                if (argsParts.Length > 0)
+                {
+                    switch (argsParts[0].ToLower())
+                    {
+                        case "debug":
+                            // Toggle debug mode directly from command
+                            Config.DebugMode = !Config.DebugMode;
+                            DebugMode = Config.DebugMode;
+                            if (Logger != null)
+                            {
+                                Logger.SetDebugMode(DebugMode);
+                                Logger.UserMessage($"Debug mode {(DebugMode ? "enabled" : "disabled")}");
+                            }
+                            Config.Save();
+                            return;
+                    }
+                }
+            }
+            
+            // Default behavior: toggle config window visibility
+            configWindow!.IsOpen = !configWindow.IsOpen;
         }
         
         private void DrawUI()
@@ -94,7 +170,7 @@ namespace Sightseeingway
         private void DrawConfigUI()
         {
             // Open the configuration window
-            configWindow.IsOpen = true;
+            configWindow!.IsOpen = true;
         }
 
         private void SetupConfigChangeWatcher()
@@ -103,8 +179,7 @@ namespace Sightseeingway
             {
                 if (args.Option is SystemConfigOption option && option == SystemConfigOption.ScreenShotDir)
                 {
-                    Log.Debug("Screenshot directory setting changed, reinitializing directories to monitor.");
-                    SendMessage("Debug: Screenshot folder changed, reinitializing directories to monitor.");
+                    Logger?.Debug("Screenshot directory setting changed, reinitializing directories to monitor.");
                     InitializeDirectoriesToMonitor();
                     IO.SetupWatchers(directoriesToMonitor, fileWatchers);
                 }
@@ -113,7 +188,7 @@ namespace Sightseeingway
 
         private void InitializeDirectoriesToMonitor()
         {
-            Log.Debug("InitializeDirectoriesToMonitor started.");
+            Logger?.Debug("InitializeDirectoriesToMonitor started.");
 
             foreach (var watcher in fileWatchers) watcher.Dispose();
             fileWatchers.Clear();
@@ -124,37 +199,36 @@ namespace Sightseeingway
             if (defaultScreenshotFolder != null)
             {
                 directoriesToMonitor.Add(defaultScreenshotFolder);
-                Log.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
+                Logger?.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
             }
 
             var gameBaseDir = Environment.GetGameDirectory();
-            var dxgiPath = Path.Combine(gameBaseDir, "dxgi.dll");
+            var dxgiPath = Path.Combine(gameBaseDir, Constants.FileOperations.DxgiFileName);
 
             if (File.Exists(dxgiPath))
             {
-                Log.Debug("dxgi.dll found, checking for INI files.");
-                foreach (var iniFileName in iniFilesToCheck)
+                Logger?.Debug("dxgi.dll found, checking for INI files.");
+                foreach (var iniFileName in Constants.FileOperations.ShaderIniFiles)
                 {
                     CheckIniFileForScreenshotPath(gameBaseDir, iniFileName);
                 }
             }
             else
             {
-                Log.Debug("dxgi.dll not found in game folder, skipping INI file checks.");
-                SendMessage("Debug: dxgi.dll not found, skipping INI file checks.");
+                Logger?.Debug("dxgi.dll not found in game folder, skipping INI file checks.");
             }
 
-            Log.Debug("InitializeDirectoriesToMonitor finished.");
+            Logger?.Debug("InitializeDirectoriesToMonitor finished.");
         }
 
         private void CheckIniFileForScreenshotPath(string gameBaseDir, string iniFileName)
         {
             var iniFilePath = Path.Combine(gameBaseDir, iniFileName);
-            Log.Debug($"Checking for {iniFileName} at: {iniFilePath}");
+            Logger?.Debug($"Checking for {iniFileName} at: {iniFilePath}");
 
             if (File.Exists(iniFilePath))
             {
-                Log.Debug($"{iniFileName} found in game folder.");
+                Logger?.Debug($"{iniFileName} found in game folder.");
                 try
                 {
                     var lines = File.ReadAllLines(iniFilePath);
@@ -164,15 +238,15 @@ namespace Sightseeingway
                     foreach (var line in lines)
                     {
                         var trimmedLine = line.Trim();
-                        if (trimmedLine == "[SCREENSHOT]")
+                        if (trimmedLine == Constants.FileOperations.ScreenshotSection)
                         {
                             inScreenshotGroup = true;
-                            Log.Debug($"Found [SCREENSHOT] group in {iniFileName}");
+                            Logger?.Debug($"Found [SCREENSHOT] group in {iniFileName}");
                         }
-                        else if (inScreenshotGroup && trimmedLine.StartsWith("SavePath="))
+                        else if (inScreenshotGroup && trimmedLine.StartsWith(Constants.FileOperations.SavePathKey))
                         {
-                            savePath = trimmedLine.Substring("SavePath=".Length).Trim().Trim('"');
-                            Log.Debug($"{iniFileName} SavePath found in ini: {savePath}");
+                            savePath = trimmedLine.Substring(Constants.FileOperations.SavePathKey.Length).Trim().Trim('"');
+                            Logger?.Debug($"{iniFileName} SavePath found in ini: {savePath}");
                             break;
                         }
                         else if (trimmedLine.StartsWith("["))
@@ -187,113 +261,122 @@ namespace Sightseeingway
                         if (!Path.IsPathRooted(savePath))
                         {
                             resolvedSavePath = Path.GetFullPath(Path.Combine(gameBaseDir, savePath));
-                            Log.Debug($"{iniFileName} SavePath is relative, resolving to absolute path: {resolvedSavePath}");
+                            Logger?.Debug($"{iniFileName} SavePath is relative, resolving to absolute path: {resolvedSavePath}");
                         }
 
                         if (!directoriesToMonitor.Contains(resolvedSavePath) && Directory.Exists(resolvedSavePath))
                         {
                             directoriesToMonitor.Add(resolvedSavePath);
-                            Log.Debug($"{iniFileName} SavePath folder added: {resolvedSavePath}");
-                            SendMessage($"Debug: {iniFileName} SavePath folder added: {resolvedSavePath}");
+                            Logger?.Debug($"{iniFileName} SavePath folder added: {resolvedSavePath}");
                         }
                         else
                         {
-                            Log.Debug($"{iniFileName} SavePath folder already monitored or does not exist: {resolvedSavePath}");
+                            Logger?.Debug($"{iniFileName} SavePath folder already monitored or does not exist: {resolvedSavePath}");
                         }
                     }
                     else
                     {
-                        Log.Debug($"{iniFileName} SavePath not found in ini.");
+                        Logger?.Debug($"{iniFileName} SavePath not found in ini.");
                     }
                 }
                 catch (Exception ex)
                 {
-                    Log.Error($"Error reading {iniFileName}: {ex}");
-                    ChatGui.PrintError($"[Sightseeingway] Error reading {iniFileName}: {ex}");
+                    Logger?.Error($"Error reading {iniFileName}", ex, true);
                 }
             }
             else
             {
-                Log.Debug($"{iniFileName} not found in game folder: {iniFilePath}");
-                SendMessage($"Debug: {iniFileName} not found in game folder: {iniFilePath}");
+                Logger?.Debug($"{iniFileName} not found in game folder: {iniFilePath}");
             }
         }
 
         private void SetupShadingwayWatcher()
         {
             var gameBaseDir = Environment.GetGameDirectory();
-            var shadingwayStateFilePath = Path.Combine(gameBaseDir, ShadingwayStateFileName);
+            var shadingwayStateFilePath = Path.Combine(gameBaseDir, Constants.FileOperations.ShadingwayStateFileName);
 
             if (File.Exists(shadingwayStateFilePath))
             {
-                Log.Debug($"Found {ShadingwayStateFileName} at: {shadingwayStateFilePath}");
+                Logger?.Debug($"Found {Constants.FileOperations.ShadingwayStateFileName} at: {shadingwayStateFilePath}");
 
                 // Load the initial state immediately, waiting for file release
-                if (IO.WaitForFileReleaseGeneric(shadingwayStateFilePath))
+                var waitResult = IO.WaitForFileReleaseGeneric(shadingwayStateFilePath);
+                if (waitResult.IsSuccess)
                 {
-                    CurrentShadingwayState = IO.LoadShadingwayState(shadingwayStateFilePath);
-
-                    if (CurrentShadingwayState?.Pid == Process.GetCurrentProcess().Id)
+                    var loadResult = IO.LoadShadingwayState(shadingwayStateFilePath);
+                    if (loadResult.IsSuccess)
                     {
-                        Client.PrintMessage("Ooh! Shadingway spotted! *waves excitedly*");
+                        CurrentShadingwayState = loadResult.Data;
+
+                        if (CurrentShadingwayState?.Pid == Process.GetCurrentProcess().Id)
+                        {
+                            SafeUserMessage("Ooh! Shadingway spotted! *waves excitedly*");
+                        }
+                    }
+                    else
+                    {
+                        Logger?.Warning(loadResult.ErrorMessage ?? "Unknown error loading Shadingway state");
                     }
                 }
                 else
                 {
-                    Log.Warning($"Could not load initial Shadingway state due to file access issues.");
-                    ChatGui.PrintError("[Sightseeingway] Warning: Could not read Shadingway state file on startup.");
+                    Logger?.Warning("Could not load initial Shadingway state due to file access issues.");
                 }
-
 
                 var watcher = new FileSystemWatcher(gameBaseDir)
                 {
-                    Filter = ShadingwayStateFileName,
+                    Filter = Constants.FileOperations.ShadingwayStateFileName,
                     EnableRaisingEvents = true,
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName
                 };
-                watcher.Changed += OnShadingwayStateFileChanged; // Use Plugin's event handler
-                watcher.Created += OnShadingwayStateFileChanged; // Use Plugin's event handler
-                watcher.Renamed += OnShadingwayStateFileChanged; // Use Plugin's event handler
+                watcher.Changed += OnShadingwayStateFileChanged;
+                watcher.Created += OnShadingwayStateFileChanged;
+                watcher.Renamed += OnShadingwayStateFileChanged;
                 fileWatchers.Add(watcher);
-                Log.Information($"Monitoring {ShadingwayStateFileName} in: {gameBaseDir}");
-                SendMessage($"Monitoring {ShadingwayStateFileName} in game folder.");
+                Logger?.Information($"Monitoring {Constants.FileOperations.ShadingwayStateFileName} in: {gameBaseDir}");
             }
             else
             {
-                Log.Debug($"{ShadingwayStateFileName} not found in game folder: {shadingwayStateFilePath}");
-                SendMessage($"Debug: {ShadingwayStateFileName} not found in game folder, monitoring disabled.");
+                Logger?.Debug($"{Constants.FileOperations.ShadingwayStateFileName} not found in game folder: {shadingwayStateFilePath}");
             }
         }
 
         // Plugin's own event handler to update the state
         private void OnShadingwayStateFileChanged(object sender, FileSystemEventArgs e)
         {
-            Log.Debug($"Shadingway State File changed: {e.FullPath}");
-            SendMessage($"Debug: Shadingway State File changed: {e.FullPath}");
+            Logger?.Debug($"Shadingway State File changed: {e.FullPath}");
+            
             // Wait for file release before loading state on file change
-            if (IO.WaitForFileReleaseGeneric(e.FullPath))
+            var waitResult = IO.WaitForFileReleaseGeneric(e.FullPath);
+            if (waitResult.IsSuccess)
             {
-                CurrentShadingwayState = IO.LoadShadingwayState(e.FullPath); // Load state on file change
+                var loadResult = IO.LoadShadingwayState(e.FullPath);
+                if (loadResult.IsSuccess)
+                {
+                    CurrentShadingwayState = loadResult.Data;
+                }
+                else
+                {
+                    // Logger?.Warning(loadResult.ErrorMessage ?? "Unknown error reloading Shadingway state");
+                }
             }
             else
             {
-                Log.Warning($"Could not reload Shadingway state due to file access issues.");
-                ChatGui.PrintError("[Sightseeingway] Warning: Could not read Shadingway state file on file change.");
+                Logger?.Warning("Could not reload Shadingway state due to file access issues.");
             }
         }
 
         public void Dispose()
         {
-            Log.Debug("Dispose started.");
-            SendMessage("Plugin Disposing...");
+            Logger?.Debug("Dispose started.");
 
             // Dispose UI
             windowSystem.RemoveAllWindows();
-            configWindow.Dispose();
+            configWindow?.Dispose();
             
             // Unregister commands
-            CommandManager.RemoveHandler("/sightseeingway");
-            CommandManager.RemoveHandler("/sway");
+            CommandManager.RemoveHandler(Constants.Plugin.Command);
+            CommandManager.RemoveHandler(Constants.Plugin.ShortCommand);
             
             // Unregister UI events
             PluginInterface.UiBuilder.Draw -= DrawUI;
@@ -301,23 +384,24 @@ namespace Sightseeingway
 
             foreach (var watcher in fileWatchers)
             {
-                Log.Debug($"Disposing watcher for folder: {watcher.Path}");
+                Logger?.Debug($"Disposing watcher for folder: {watcher.Path}");
                 watcher.Created -= IO.OnFileCreated;
-                watcher.Changed -= OnShadingwayStateFileChanged; // Use Plugin's event handler
+                watcher.Changed -= OnShadingwayStateFileChanged;
                 watcher.Dispose();
-                Log.Debug($"Watcher for folder disposed: {watcher.Path}");
+                Logger?.Debug($"Watcher for folder disposed: {watcher.Path}");
             }
             fileWatchers.Clear();
-            Log.Debug("Watcher list cleared.");
-            Log.Debug("Dispose finished.");
-            SendMessage("Plugin Disposed.");
+            Logger?.Debug("Watcher list cleared.");
+            Logger?.Debug("Dispose finished.");
+            SafeUserMessage("Plugin Disposed.");
         }
 
+        // Update the static SendMessage method to use our Logger instead
         public static void SendMessage(string message)
         {
-            if (DebugMode)
+            if (DebugMode && Logger != null)
             {
-                Client.PrintMessage(message);
+                Logger.UserMessage(message);
             }
         }
     }

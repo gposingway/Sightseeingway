@@ -8,7 +8,8 @@ using System.Collections.Generic;
 using Newtonsoft.Json;
 using System.Diagnostics;
 using System.Collections.Concurrent;
-using System.Linq; // Added missing using directive
+using System.Linq;
+using Sightseeingway.Results;
 
 namespace Sightseeingway
 {
@@ -30,18 +31,15 @@ namespace Sightseeingway
             }
         }
 
-        // Modified to return ShadingwayState and renamed to LoadShadingwayState
-        public static ShadingwayState? LoadShadingwayState(string filePath)
+        public static OperationResult<ShadingwayState> LoadShadingwayState(string filePath)
         {
-            Plugin.SendMessage($"LoadShadingwayState started for: {filePath}");
-            Plugin.SendMessage($"Debug: LoadShadingwayState for: {filePath}");
-            ShadingwayState? state = null;
-
-            if (!WaitForFileReleaseGeneric(filePath, FileAccess.Read)) // Wait for file release using generic method
+            Plugin.Logger?.Debug($"LoadShadingwayState started for: {filePath}");
+            
+            var waitResult = WaitForFileReleaseGeneric(filePath, FileAccess.Read);
+            if (!waitResult.IsSuccess)
             {
-                Plugin.Log.Warning($"Shadingway state file not released in time for reading: {filePath}");
-                Plugin.ChatGui.PrintError($"[Sightseeingway] Warning: Shadingway state file not released in time, may read incomplete data.");
-                return null; // Return null to indicate load failure due to file access
+                return OperationResult<ShadingwayState>.Failure(waitResult.ErrorMessage ?? 
+                    $"Shadingway state file not released in time for reading: {filePath}");
             }
 
             try
@@ -50,26 +48,30 @@ namespace Sightseeingway
                 using (JsonTextReader reader = new JsonTextReader(file))
                 {
                     var serializer = new JsonSerializer();
-                    state = serializer.Deserialize<ShadingwayState>(reader);
+                    var state = serializer.Deserialize<ShadingwayState>(reader);
+                    
                     if (state != null)
                     {
-
                         var jsonPid = state.Pid;
                         var currentPid = Process.GetCurrentProcess().Id;
 
                         if (jsonPid == currentPid)
                         {
-
                             EffectsEnabled = state.Effects?.Enabled ?? false;
                             CurrentPresetName = state.Preset?.Name;
-                            Plugin.SendMessage($"Shadingway State Parsed: EffectsEnabled={EffectsEnabled}, PresetName={CurrentPresetName}");
-                            Plugin.SendMessage($"Debug: Shadingway Preset: {CurrentPresetName}, Effects: {(EffectsEnabled ? "Enabled" : "Disabled")}");
+                            Plugin.Logger?.Debug($"Shadingway State Parsed: EffectsEnabled={EffectsEnabled}, PresetName={CurrentPresetName}");
                         }
                         else
                         {
                             EffectsEnabled = false;
                             CurrentPresetName = null;
                         }
+                        
+                        return OperationResult<ShadingwayState>.Success(state);
+                    }
+                    else
+                    {
+                        return OperationResult<ShadingwayState>.Failure("Failed to deserialize Shadingway state");
                     }
                 }
             }
@@ -77,129 +79,112 @@ namespace Sightseeingway
             {
                 CurrentPresetName = null;
                 EffectsEnabled = false;
-                return null; // Indicate load failure
+                return OperationResult<ShadingwayState>.Failure(ex);
             }
-            Plugin.SendMessage($"LoadShadingwayState finished for: {filePath}");
-            return state; // Return the loaded state
         }
 
-
-        // Generic method to wait for file release
-        public static bool WaitForFileReleaseGeneric(string filePath, FileAccess fileAccess = FileAccess.Read)
+        public static OperationResult WaitForFileReleaseGeneric(string filePath, FileAccess fileAccess = FileAccess.Read)
         {
-            Plugin.SendMessage($"WaitForFileReleaseGeneric started for: {filePath}, FileAccess: {fileAccess}");
-            const int maxTries = 30;
-            for (var i = 0; i < maxTries; ++i)
+            Plugin.Logger?.Debug($"WaitForFileReleaseGeneric started for: {filePath}, FileAccess: {fileAccess}");
+            
+            for (var i = 0; i < Constants.FileOperations.MaxFileTries; ++i)
             {
                 try
                 {
-                    Plugin.SendMessage($"Attempt {i + 1}/{maxTries} to open file: {filePath} with FileAccess.{fileAccess}");
-                    using (var fs = File.Open(filePath, FileMode.Open, fileAccess, FileShare.ReadWrite)) // Allow shared read/write for generic use
+                    Plugin.Logger?.Debug($"Attempt {i + 1}/{Constants.FileOperations.MaxFileTries} to open file: {filePath}");
+                    using (var fs = File.Open(filePath, FileMode.Open, fileAccess, FileShare.ReadWrite))
                     {
-                        Plugin.SendMessage($"File opened successfully on attempt {i + 1}: {filePath}");
-                        return true;
+                        Plugin.Logger?.Debug($"File opened successfully on attempt {i + 1}: {filePath}");
+                        return OperationResult.Success();
                     }
                 }
                 catch (IOException)
                 {
-                    Plugin.SendMessage($"IOException on attempt {i + 1}: {filePath} - File likely still in use.");
-                    Thread.Sleep(500);
+                    Thread.Sleep(Constants.FileOperations.FileReleaseWaitTimeMs);
                 }
                 catch (Exception ex)
                 {
-                    Plugin.Log.Error($"Error waiting for file release: {filePath} - {ex}");
-                    Plugin.ChatGui.PrintError($"[Sightseeingway] Error waiting for file release: {filePath} - {ex}");
-                    return false;
+                    return OperationResult.Failure($"Error waiting for file release: {filePath}", ex);
                 }
             }
-            Plugin.Log.Warning($"WaitForFileReleaseGeneric failed after {maxTries} attempts for: {filePath}");
-            return false;
+            
+            return OperationResult.Failure($"File not released after {Constants.FileOperations.MaxFileTries} attempts: {filePath}");
         }
-
-        // Placeholder - No longer used directly by FileSystemWatcher, Plugin has its own handler now
-        public static void OnShadingwayStateChanged(object sender, FileSystemEventArgs e)
-        {
-            // This method is now a placeholder, the Plugin class handles the event directly
-            Plugin.SendMessage("IO.OnShadingwayStateChanged PLACEHOLDER - Event handled in Plugin.cs");
-        }
-
 
         public static void OnFileCreated(object sender, FileSystemEventArgs e)
         {
             var filePath = e.FullPath;
             var extension = Path.GetExtension(filePath).ToLowerInvariant();
 
-            if (extension != ".jpg" && extension != ".jpeg" && extension != ".png") return;
+            if (!Constants.FileOperations.SupportedImageExtensions.Contains(extension)) return;
 
-            Plugin.SendMessage($"File Created event triggered for: {filePath}");
-            Plugin.SendMessage($"Debug: File Created: {filePath}");
+            Plugin.Logger?.Debug($"File Created event triggered for: {filePath}");
 
             if (Caching.IsInRenameCache(filePath))
             {
-                Plugin.SendMessage($"File '{e.Name}' is in rename cache, ignoring.");
-                Plugin.SendMessage($"Debug: Ignoring cached filename: {filePath}");
+                Plugin.Logger?.Debug($"File '{e.Name}' is in rename cache, ignoring.");
                 return;
             }
 
-            if (WaitForFileReleaseGeneric(filePath)) // Now uses generic WaitForFileReleaseGeneric with FileAccess.ReadWrite
+            var waitResult = WaitForFileReleaseGeneric(filePath);
+            if (waitResult.IsSuccess)
             {
                 RenameFile(filePath);
             }
             else
             {
-                Plugin.Log.Warning($"File not released in time for renaming: {filePath}");
-                Plugin.SendMessage($"Warning: File not released in time: {filePath}");
+                Plugin.Logger?.Warning($"File not released in time for renaming: {filePath}");
             }
         }
 
-        public static bool MoveFileWithRetry(string sourceFilePath, string destFilePath)
+        public static OperationResult MoveFileWithRetry(string sourceFilePath, string destFilePath)
         {
-            Plugin.SendMessage($"MoveFileWithRetry started from: {sourceFilePath} to {destFilePath}");
-            const int maxTries = 10;
-            for (int i = 0; i < maxTries; ++i)
+            Plugin.Logger?.Debug($"MoveFileWithRetry started from: {sourceFilePath} to {destFilePath}");
+            
+            for (int i = 0; i < Constants.FileOperations.MaxMoveTries; ++i)
             {
-                if (WaitForFileReleaseGeneric(sourceFilePath, FileAccess.ReadWrite)) // Wait for release with ReadWrite access
+                var waitResult = WaitForFileReleaseGeneric(sourceFilePath, FileAccess.ReadWrite);
+                if (waitResult.IsSuccess)
                 {
                     try
                     {
-                        Plugin.SendMessage($"Attempt {i + 1}/{maxTries} to move file: {sourceFilePath} to {destFilePath}");
+                        Plugin.Logger?.Debug($"Attempt {i + 1}/{Constants.FileOperations.MaxMoveTries} to move file");
                         File.Move(sourceFilePath, destFilePath);
-                        Plugin.Log.Information($"File moved successfully to: {destFilePath}");
-                        return true; // Move successful
+                        Plugin.Logger?.Information($"File moved successfully to: {destFilePath}");
+                        return OperationResult.Success();
                     }
                     catch (IOException ex)
                     {
-                        Plugin.Log.Warning($"IOException during MoveFile on attempt {i + 1}: {ex.Message}");
-                        if (i == maxTries - 1) // Only print error to chat on the last retry
+                        Plugin.Logger?.Debug($"IOException during MoveFile on attempt {i + 1}: {ex.Message}");
+                        
+                        if (i == Constants.FileOperations.MaxMoveTries - 1)
                         {
-                            Plugin.ChatGui.PrintError($"[Sightseeingway] Error moving file {Path.GetFileName(sourceFilePath)} to {Path.GetFileName(destFilePath)}: {ex.Message}");
+                            return OperationResult.Failure($"File locked after multiple attempts: {Path.GetFileName(sourceFilePath)}", ex);
                         }
-                        Thread.Sleep(100); // Wait before retrying
+                        
+                        Thread.Sleep(Constants.FileOperations.MoveRetryWaitTimeMs);
                     }
                     catch (Exception ex)
                     {
-                        Plugin.Log.Error($"Error during MoveFile for {sourceFilePath} to {destFilePath}: {ex}");
-                        Plugin.ChatGui.PrintError($"[Sightseeingway] Error moving {Path.GetFileName(sourceFilePath)}: {ex.Message}");
-                        return false; // Non-IO exception, stop retrying
+                        return OperationResult.Failure($"Error moving file: {Path.GetFileName(sourceFilePath)}", ex);
                     }
                 }
                 else
                 {
-                    Plugin.Log.Warning($"File not released in time for move on attempt {i + 1}: {sourceFilePath}");
-                    if (i == maxTries - 1) // Only print warning to chat on the last retry
+                    if (i == Constants.FileOperations.MaxMoveTries - 1)
                     {
-                        Plugin.ChatGui.PrintError($"[Sightseeingway] Warning: File {Path.GetFileName(sourceFilePath)} not released in time for renaming after multiple attempts.");
+                        return OperationResult.Failure(waitResult.ErrorMessage ?? 
+                            $"File not released for move after {Constants.FileOperations.MaxMoveTries} attempts");
                     }
-                    return false; // File not released in time
                 }
             }
-            Plugin.Log.Warning($"MoveFileWithRetry failed after {maxTries} attempts for: {sourceFilePath} to {destFilePath}");
-            return false; // Move failed after all retries
+            
+            return OperationResult.Failure($"Move operation failed after {Constants.FileOperations.MaxMoveTries} attempts");
         }
 
         public static void RenameFile(string filePath)
         {
-            Plugin.SendMessage($"RenameFile started for: {filePath}");
+            Plugin.Logger?.Debug($"RenameFile started for: {filePath}");
 
             Plugin.Framework.RunOnTick(() =>
             {
@@ -208,42 +193,36 @@ namespace Sightseeingway
                     var newFilePath = ResolveNewFileName(filePath);
                     if (newFilePath == null) return;
 
-                    Plugin.SendMessage($"Renaming '{filePath}' to '{newFilePath}'");
+                    Plugin.Logger?.Debug($"Renaming '{filePath}' to '{newFilePath}'");
 
                     Caching.AddToRenameCache(Path.GetFileName(newFilePath));
-
                     QueueRenameOperation(filePath, newFilePath);
 
-                    Plugin.Log.Information($"Renamed file to: {newFilePath}");
+                    Plugin.Logger?.Information($"Renamed file to: {newFilePath}");
                     Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
                 }
                 catch (Exception ex)
                 {
-                    Plugin.Log.Error($"Error during RenameFile for {filePath}: {ex}");
-                    Plugin.ChatGui.PrintError($"[Sightseeingway] Error renaming {Path.GetFileName(filePath)}: {ex.Message}");
+                    Plugin.Logger?.Error($"Error during RenameFile for {filePath}", ex, true);
                 }
 
-                Plugin.SendMessage($"RenameFile finished for: {filePath}");
+                Plugin.Logger?.Debug($"RenameFile finished for: {filePath}");
             }, default, 30);
         }
 
-        public static string? ResolveNewFileName(string filePath) // Made nullable to match return type
+        public static string? ResolveNewFileName(string filePath)
         {
             var fileName = Path.GetFileName(filePath);
             var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
 
-            // Check if the filename already starts with a timestamp (e.g., already processed or from another tool)
-            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), "yyyyMMddHHmmssfff", null, System.Globalization.DateTimeStyles.None, out _))
+            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), Constants.Formats.CompactTimestamp, null, System.Globalization.DateTimeStyles.None, out _))
             {
-                return null; // Indicate no rename needed
+                return null;
             }
 
             var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
 
-            // Parse the SelectedFields string to get active fields in order.
             var activeFieldsInOrder = FilenameGenerator.StringToFieldList(config.SelectedFields);
-            
-            // Ensure Timestamp is first if not already, or add it if missing
             activeFieldsInOrder = FilenameGenerator.EnsureTimestampIsFirst(activeFieldsInOrder);
 
             var fileCreationTime = File.GetCreationTime(filePath);
@@ -261,7 +240,7 @@ namespace Sightseeingway
                 if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
                 {
                     var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
-                    if (mapType.RowId > 0) // Check if valid row
+                    if (mapType.RowId > 0)
                     {
                         try
                         {
@@ -274,10 +253,10 @@ namespace Sightseeingway
                         }
                         catch (Exception ex)
                         {
-                            Plugin.Log.Debug($"Error extracting map name: {ex.Message}"); // Keep log for debugging
+                            Plugin.Logger?.Debug($"Error extracting map name: {ex.Message}");
                         }
 
-                        Plugin.SendMessage($"Map name resolved: {map}");
+                        Plugin.Logger?.Debug($"Map name resolved: {map}");
 
                         try
                         {
@@ -294,13 +273,13 @@ namespace Sightseeingway
                         }
                         catch (Exception ex)
                         {
-                            Plugin.Log.Debug($"Error calculating coordinates: {ex.Message}");
+                            Plugin.Logger?.Debug($"Error calculating coordinates: {ex.Message}");
                         }
                     }
                 }
                 else
                 {
-                    Plugin.Log.Warning("Map sheet not found or MapId is 0.");
+                    Plugin.Logger?.Warning("Map sheet not found or MapId is 0.");
                 }
 
                 if (!string.IsNullOrEmpty(map))
@@ -318,7 +297,6 @@ namespace Sightseeingway
                 }
             }
 
-            // Use the centralized filename generation method
             var constructedFilename = FilenameGenerator.GenerateFilename(
                 fileCreationTime,
                 config.TimestampFormat,
@@ -333,7 +311,6 @@ namespace Sightseeingway
                 fileExtension
             );
 
-            // Clean up invalid characters from the filename  
             foreach (var c in Path.GetInvalidFileNameChars())
             {
                 constructedFilename = constructedFilename.Replace(c.ToString(), "");
@@ -348,34 +325,34 @@ namespace Sightseeingway
         public static void QueueRenameOperation(string sourceNamePath, string finalName)
         {
             RenameQueue.Enqueue((sourceNamePath, finalName));
-            RenameTimer.Change(3000, Timeout.Infinite); // Wait for 3 seconds without writes
+            RenameTimer.Change(Constants.FileOperations.RenameQueueDelayMs, Timeout.Infinite);
         }
 
         private static void RenameQueuedFiles(object? state)
         {
             while (RenameQueue.TryDequeue(out var renameOperation))
             {
-                if (WaitForFileReleaseGeneric(renameOperation.SourceNamePath, FileAccess.ReadWrite))
+                var waitResult = WaitForFileReleaseGeneric(renameOperation.SourceNamePath, FileAccess.ReadWrite);
+                if (waitResult.IsSuccess)
                 {
-                    try
+                    var moveResult = MoveFileWithRetry(renameOperation.SourceNamePath, renameOperation.FinalName);
+                    if (moveResult.IsSuccess)
                     {
-                        MoveFileWithRetry(renameOperation.SourceNamePath, renameOperation.FinalName);
-                        Plugin.Log.Information($"File renamed from {renameOperation.SourceNamePath} to {renameOperation.FinalName}");
+                        Plugin.Logger?.Information($"File renamed from {renameOperation.SourceNamePath} to {renameOperation.FinalName}");
                     }
-                    catch (Exception ex)
+                    else
                     {
-                        Plugin.Log.Error($"Error renaming file from {renameOperation.SourceNamePath} to {renameOperation.FinalName}: {ex}");
-                        Plugin.ChatGui.PrintError($"[Sightseeingway] Error renaming {Path.GetFileName(renameOperation.SourceNamePath)}: {ex.Message}");
+                        Plugin.Logger?.Error(moveResult.ErrorMessage ?? 
+                            $"Unknown error renaming {Path.GetFileName(renameOperation.SourceNamePath)}", 
+                            moveResult.Exception, true);
                     }
                 }
                 else
                 {
-                    Plugin.Log.Warning($"File not released in time for renaming: {renameOperation.SourceNamePath}");
-                    Plugin.ChatGui.PrintError($"[Sightseeingway] Warning: File {Path.GetFileName(renameOperation.SourceNamePath)} not released in time for renaming.");
+                    Plugin.Logger?.Warning($"File not released in time for renaming: {renameOperation.SourceNamePath}");
                 }
             }
         }
-
     }
 
     public class ShadingwayState
@@ -388,7 +365,6 @@ namespace Sightseeingway
     public class Effects
     {
         public bool Enabled { get; set; }
-        // Add other properties from "effects" if needed
     }
 
     public class Preset
@@ -396,7 +372,5 @@ namespace Sightseeingway
         public string? Collection { get; set; }
         public string? Name { get; set; }
         public string? Path { get; set; }
-        // Add other properties from "preset" if needed
     }
-
 }
