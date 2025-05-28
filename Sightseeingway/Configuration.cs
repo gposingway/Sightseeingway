@@ -9,7 +9,7 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public int Version { get; set; } = 3; // Incremented version due to adding timestamp format option
+        public int Version { get; set; } = 4; // Incremented version due to adding show name changes in chat option
 
         // Stores selected fields as a comma-separated string in display order.
         // Example: "Timestamp,CharacterName,MapName,Position,EorzeaTime,Weather,ShaderPreset"
@@ -20,6 +20,9 @@ namespace Sightseeingway
         
         // Debug Mode toggle
         public bool DebugMode { get; set; } = false;
+
+        // Whether to show name changes in chat window
+        public bool ShowNameChangesInChat { get; set; } = true;
 
         public static string GetDefaultSelectedFields() =>
             string.Join(",", Enum.GetValues(typeof(FilenameField)).Cast<FilenameField>().Select(f => f.ToString()));

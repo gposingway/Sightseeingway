@@ -46,7 +46,8 @@ namespace Sightseeingway
                 Version = config.Version,
                 SelectedFields = config.SelectedFields,
                 TimestampFormat = config.TimestampFormat,
-                DebugMode = config.DebugMode
+                DebugMode = config.DebugMode,
+                ShowNameChangesInChat = config.ShowNameChangesInChat
             };
         }
 
@@ -147,20 +148,37 @@ namespace Sightseeingway
                 
                 ImGui.EndChild();
             }
-            
-            ImGui.Spacing();
+              ImGui.Spacing();
             
             // Example filename preview
             filenamePreview.Render();
             
             ImGui.Spacing();
-            
-            // Debug Mode Section
-            ImGui.TextColored(new Vector4(1.0f, 0.85f, 0.0f, 1.0f), "Debug Settings");
+              // Notification Settings
+            ImGui.TextColored(new Vector4(0.0f, 0.85f, 1.0f, 1.0f), "Notification Settings");
             ImGui.Spacing();
             
+            // First checkbox - Show name changes in chat
+            bool showNameChangesInChat = tempConfig.ShowNameChangesInChat;
+            if (ImGui.Checkbox("Show name changes in chat window", ref showNameChangesInChat))
+            {
+                tempConfig.ShowNameChangesInChat = showNameChangesInChat;
+                configChanged = true;
+            }
+            
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.Text("Shows a message in the chat window when a screenshot is renamed.");
+                ImGui.Text("Disable this if you don't want to see these notifications.");
+                ImGui.EndTooltip();
+            }
+            
+            // Second checkbox - Debug Mode (on same line)
+            ImGui.SameLine(ImGui.GetWindowWidth() * 0.7f);
+            
             bool debugMode = tempConfig.DebugMode;
-            if (ImGui.Checkbox("Enable Debug Mode", ref debugMode))
+            if (ImGui.Checkbox("Debug Mode", ref debugMode))
             {
                 tempConfig.DebugMode = debugMode;
                 configChanged = true;
@@ -171,6 +189,14 @@ namespace Sightseeingway
                 ImGui.BeginTooltip();
                 ImGui.Text("Enables additional logging and debug information.");
                 ImGui.Text("This may affect performance but helps with troubleshooting.");
+                ImGui.EndTooltip();
+            }
+            
+            if (ImGui.IsItemHovered())
+            {
+                ImGui.BeginTooltip();
+                ImGui.Text("Shows a message in the chat window when a screenshot is renamed.");
+                ImGui.Text("Disable this if you don't want to see these notifications.");
                 ImGui.EndTooltip();
             }
             
@@ -220,6 +246,7 @@ namespace Sightseeingway
         {
             config.SelectedFields = fieldOrdering.GetSelectedFieldsString();
             config.TimestampFormat = tempConfig.TimestampFormat;
+            config.ShowNameChangesInChat = tempConfig.ShowNameChangesInChat;
             
             // Update debug mode setting and apply it immediately
             bool debugModeChanged = config.DebugMode != tempConfig.DebugMode;
@@ -239,6 +266,7 @@ namespace Sightseeingway
             tempConfig.SelectedFields = Configuration.GetDefaultSelectedFields();
             tempConfig.TimestampFormat = TimestampFormat.Compact;
             tempConfig.DebugMode = false;
+            tempConfig.ShowNameChangesInChat = true;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
         }
         

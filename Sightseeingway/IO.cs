@@ -199,7 +199,13 @@ namespace Sightseeingway
                     QueueRenameOperation(filePath, newFilePath);
 
                     Plugin.Logger?.Information($"Renamed file to: {newFilePath}");
-                    Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
+                    // Get the config and check if we should show chat notifications
+                    var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+                    
+                    if (config.ShowNameChangesInChat)
+                    {
+                        Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
+                    }
                 }
                 catch (Exception ex)
                 {
@@ -338,7 +344,15 @@ namespace Sightseeingway
                     var moveResult = MoveFileWithRetry(renameOperation.SourceNamePath, renameOperation.FinalName);
                     if (moveResult.IsSuccess)
                     {
+                        // Get the config and check if we should show chat notifications
+                        var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+                        
                         Plugin.Logger?.Information($"File renamed from {renameOperation.SourceNamePath} to {renameOperation.FinalName}");
+                        
+                        if (config.ShowNameChangesInChat)
+                        {
+                            Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(renameOperation.FinalName)}");
+                        }
                     }
                     else
                     {
