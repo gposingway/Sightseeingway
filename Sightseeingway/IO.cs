@@ -120,7 +120,7 @@ namespace Sightseeingway
 
             Plugin.Logger?.Debug($"File Created event triggered for: {filePath}");
 
-            if (Caching.IsInRenameCache(filePath))
+            if (Caching.IsInRenameCache(Path.GetFileName(filePath)))
             {
                 Plugin.Logger?.Debug($"File '{e.Name}' is in rename cache, ignoring.");
                 return;
@@ -198,14 +198,7 @@ namespace Sightseeingway
                     Caching.AddToRenameCache(Path.GetFileName(newFilePath));
                     QueueRenameOperation(filePath, newFilePath);
 
-                    Plugin.Logger?.Information($"Renamed file to: {newFilePath}");
-                    // Get the config and check if we should show chat notifications
-                    var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-                    
-                    if (config.ShowNameChangesInChat)
-                    {
-                        Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(newFilePath)}");
-                    }
+                    Plugin.Logger?.Debug($"Queued file for rename to: {newFilePath}");
                 }
                 catch (Exception ex)
                 {
