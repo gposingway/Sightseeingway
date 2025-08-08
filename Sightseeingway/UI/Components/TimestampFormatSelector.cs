@@ -1,5 +1,5 @@
 // filepath: f:\Replica\NAS\Files\repo\github\Sightseeingway\Sightseeingway\UI\Components\TimestampFormatSelector.cs
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using System;
 
 namespace Sightseeingway.UI.Components
@@ -22,12 +22,12 @@ namespace Sightseeingway.UI.Components
         public TimestampFormatSelector()
         {
             _sampleTimestamp = DateTime.Now;
-            _formatExamples = new string[] 
-            {
+            _formatExamples =
+            [
                 FilenameGenerator.FormatTimestamp(_sampleTimestamp, TimestampFormat.Compact),
                 FilenameGenerator.FormatTimestamp(_sampleTimestamp, TimestampFormat.Regular),
                 FilenameGenerator.FormatTimestamp(_sampleTimestamp, TimestampFormat.Readable)
-            };
+            ];
         }
         
         /// <summary>

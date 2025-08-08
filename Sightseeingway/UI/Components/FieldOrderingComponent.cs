@@ -1,5 +1,5 @@
 // filepath: f:\Replica\NAS\Files\repo\github\Sightseeingway\Sightseeingway\UI\Components\FieldOrderingComponent.cs
-using ImGuiNET;
+using Dalamud.Bindings.ImGui;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -86,7 +86,7 @@ namespace Sightseeingway.UI.Components
 
                 // Disable up arrow for timestamp and the item immediately after it
                 ImGui.BeginDisabled(isTimestampField || i <= 1);
-                if (ImGui.ArrowButton("##up", ImGuiDir.Up))
+                if (ImGui.Button("↑"))
                 {
                     if (i > 1)
                     {
@@ -102,7 +102,7 @@ namespace Sightseeingway.UI.Components
 
                 // Disable down arrow for the last item
                 ImGui.BeginDisabled(isTimestampField || i == _orderedFields.Count - 1);
-                if (ImGui.ArrowButton("##down", ImGuiDir.Down))
+                if (ImGui.Button("↓"))
                 {
                     if (i < _orderedFields.Count - 1)
                     {

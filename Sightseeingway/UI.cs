@@ -1,10 +1,10 @@
 using Dalamud.Interface.Windowing;
-using ImGuiNET;
 using System;
 using System.Collections.Generic;
 using System.Numerics;
 using Sightseeingway.UI.Components;
 using Dalamud.Utility;
+using Dalamud.Bindings.ImGui;
 
 namespace Sightseeingway
 {
