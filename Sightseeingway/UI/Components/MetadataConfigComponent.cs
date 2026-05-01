@@ -18,7 +18,8 @@ namespace Sightseeingway.UI.Components
             ("Scene", MetadataField.Time,     "Eorzea Time",            "Eorzean time of day (period and hour)."),
             ("Scene", MetadataField.Weather,  "Weather",                "Current in-game weather."),
             ("Scene", MetadataField.Flags,    "Flags",                  "Mode and state flags: gpose, mounted, swimming, etc."),
-            ("Scene", MetadataField.Shader,   "Shader Preset",          "Active Shadingway preset, when Shadingway is detected."),
+            ("Scene", MetadataField.Shader,   "Shader Preset",          "Active Shadingway preset (collection, name, and full preset path)."),
+            ("Scene", MetadataField.Display,  "Display",                "Resolution, aspect ratio, and screen type at capture time."),
 
             // Character
             ("Character", MetadataField.CharacterData,  "Character Data",  "Bundled: name, race/tribe/sex, job/level, title."),

@@ -25,6 +25,7 @@ namespace Sightseeingway.Metadata
             var weather = TryCaptureWeather();
             var time = TryCaptureTime();
             var shader = TryCaptureShader();
+            var display = TryCaptureDisplay();
             var flags = CaptureFlags();
 
             return new StateSnapshot
@@ -36,6 +37,7 @@ namespace Sightseeingway.Metadata
                 Weather = weather,
                 Time = time,
                 Shader = shader,
+                Display = display,
                 Flags = flags,
             };
         }
@@ -204,13 +206,38 @@ namespace Sightseeingway.Metadata
             try
             {
                 if (!IO.EffectsEnabled) return null;
-                var preset = IO.CurrentPresetName;
-                if (string.IsNullOrEmpty(preset)) return null;
-                return new ShaderInfo(null, preset);
+
+                var preset = IO.CurrentShadingwayState?.Preset;
+                if (preset == null || string.IsNullOrEmpty(preset.Name)) return null;
+
+                return new ShaderInfo(
+                    Collection: NullIfEmpty(preset.Collection),
+                    Preset: preset.Name,
+                    Path: NullIfEmpty(preset.Path));
             }
             catch (Exception ex)
             {
                 Plugin.Logger?.Debug($"Shader capture failed: {ex.Message}");
+                return null;
+            }
+        }
+
+        private static DisplayInfo? TryCaptureDisplay()
+        {
+            try
+            {
+                var display = IO.CurrentShadingwayState?.Display;
+                if (display == null || display.Width <= 0 || display.Height <= 0) return null;
+
+                return new DisplayInfo(
+                    Width: display.Width,
+                    Height: display.Height,
+                    AspectRatio: Math.Round(display.AspectRatio, 3),
+                    ScreenType: NullIfEmpty(display.ScreenType));
+            }
+            catch (Exception ex)
+            {
+                Plugin.Logger?.Debug($"Display capture failed: {ex.Message}");
                 return null;
             }
         }

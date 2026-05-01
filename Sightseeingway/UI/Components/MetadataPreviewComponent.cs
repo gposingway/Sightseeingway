@@ -80,7 +80,8 @@ namespace Sightseeingway.UI.Components
                 new Position(10.5f, 15.2f, 0.0f)),
             Time = new TimeInfo(new EorzeaTime("Day", 14)),
             Weather = new NamedId(1, "Clear Skies"),
-            Shader = new ShaderInfo("Default", "MyPreset"),
+            Shader = new ShaderInfo("Witch's Presets", "Witch'sOccult", "E:\\Games\\reshade-presets\\Witch's Presets\\Witch'sOccult.ini"),
+            Display = new DisplayInfo(3840, 2160, 1.778, "4k"),
             Flags = new List<string> { "gameplay", "mounted" },
         };
     }

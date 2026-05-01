@@ -41,7 +41,10 @@ namespace Sightseeingway.Metadata
         [JsonProperty("shader", NullValueHandling = NullValueHandling.Ignore, Order = 8)]
         public ShaderInfo? Shader { get; init; }
 
-        [JsonProperty("flags", NullValueHandling = NullValueHandling.Ignore, Order = 9)]
+        [JsonProperty("display", NullValueHandling = NullValueHandling.Ignore, Order = 9)]
+        public DisplayInfo? Display { get; init; }
+
+        [JsonProperty("flags", NullValueHandling = NullValueHandling.Ignore, Order = 10)]
         public IReadOnlyList<string>? Flags { get; init; }
 
         /// <summary>
@@ -88,6 +91,7 @@ namespace Sightseeingway.Metadata
                 Time = config.IsMetadataFieldEnabled(MetadataField.Time) ? Time : null,
                 Weather = config.IsMetadataFieldEnabled(MetadataField.Weather) ? Weather : null,
                 Shader = config.IsMetadataFieldEnabled(MetadataField.Shader) ? Shader : null,
+                Display = config.IsMetadataFieldEnabled(MetadataField.Display) ? Display : null,
                 Flags = config.IsMetadataFieldEnabled(MetadataField.Flags) ? Flags : null,
             };
         }
@@ -167,5 +171,12 @@ namespace Sightseeingway.Metadata
 
     public sealed record ShaderInfo(
         [property: JsonProperty("collection", NullValueHandling = NullValueHandling.Ignore)] string? Collection,
-        [property: JsonProperty("preset", NullValueHandling = NullValueHandling.Ignore)] string? Preset);
+        [property: JsonProperty("preset", NullValueHandling = NullValueHandling.Ignore)] string? Preset,
+        [property: JsonProperty("path", NullValueHandling = NullValueHandling.Ignore)] string? Path);
+
+    public sealed record DisplayInfo(
+        [property: JsonProperty("width")] int Width,
+        [property: JsonProperty("height")] int Height,
+        [property: JsonProperty("aspectRatio")] double AspectRatio,
+        [property: JsonProperty("screenType", NullValueHandling = NullValueHandling.Ignore)] string? ScreenType);
 }

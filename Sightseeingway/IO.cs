@@ -17,6 +17,7 @@ namespace Sightseeingway
     {
         public static string? CurrentPresetName { get; private set; }
         public static bool EffectsEnabled { get; private set; }
+        public static ShadingwayState? CurrentShadingwayState { get; private set; }
 
         public static MetadataPipeline? Pipeline { get; set; }
 
@@ -58,6 +59,7 @@ namespace Sightseeingway
                 {
                     EffectsEnabled = state.Effects?.Enabled ?? false;
                     CurrentPresetName = state.Preset?.Name;
+                    CurrentShadingwayState = state;
                     Plugin.Logger?.Debug(
                         $"Shadingway State Parsed: EffectsEnabled={EffectsEnabled}, PresetName={CurrentPresetName}");
                 }
@@ -65,6 +67,7 @@ namespace Sightseeingway
                 {
                     EffectsEnabled = false;
                     CurrentPresetName = null;
+                    CurrentShadingwayState = null;
                 }
 
                 return OperationResult<ShadingwayState>.Success(state);
@@ -73,6 +76,7 @@ namespace Sightseeingway
             {
                 CurrentPresetName = null;
                 EffectsEnabled = false;
+                CurrentShadingwayState = null;
                 return OperationResult<ShadingwayState>.Failure(ex);
             }
         }
@@ -343,9 +347,18 @@ namespace Sightseeingway
 
     public class ShadingwayState
     {
+        public Display? Display { get; set; }
         public Effects? Effects { get; set; }
         public Preset? Preset { get; set; }
         public int Pid { get; set; }
+    }
+
+    public class Display
+    {
+        [JsonProperty("aspect_ratio")] public double AspectRatio { get; set; }
+        [JsonProperty("height")] public int Height { get; set; }
+        [JsonProperty("screen_type")] public string? ScreenType { get; set; }
+        [JsonProperty("width")] public int Width { get; set; }
     }
 
     public class Effects

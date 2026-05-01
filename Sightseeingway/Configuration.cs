@@ -66,6 +66,7 @@ namespace Sightseeingway
             [nameof(MetadataField.Weather)]     = true,
             [nameof(MetadataField.Flags)]       = true,
             [nameof(MetadataField.Shader)]      = true,
+            [nameof(MetadataField.Display)]     = true,
 
             // Character group
             [nameof(MetadataField.CharacterData)]   = true,   // bundled: name, race/tribe/sex, job, title
@@ -135,6 +136,7 @@ namespace Sightseeingway
         Weather,
         Flags,
         Shader,
+        Display,
 
         // Character group
         CharacterData,    // bundle: name, race/tribe/sex, job/level, title

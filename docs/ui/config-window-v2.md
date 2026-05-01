@@ -71,7 +71,8 @@ state.
 | Scene | Time | ON |
 | Scene | Weather | ON |
 | Scene | Flags | ON |
-| Scene | Shader | ON |
+| Scene | Shader Preset (collection, name, path) | ON |
+| Scene | Display (resolution, aspect, screen type) | ON |
 | Character | Character Data (name, race/tribe/sex, job/level, title) | ON |
 | Character | World | OFF |
 | Character | Mount / Minion | ON |
