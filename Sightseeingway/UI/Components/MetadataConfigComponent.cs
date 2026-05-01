@@ -79,16 +79,18 @@ namespace Sightseeingway.UI.Components
         {
             var changed = false;
 
-            // Compute parent state from children.
+            // Compute parent state. Binary: parent is checked iff every child is on.
+            // Mixed and empty both render as unchecked; the (N/M) counter conveys
+            // the intermediate truth without a third visual style.
             var (on, total) = CountChildren(tempConfig, groupName);
-            var parentState = on == 0 ? CheckState.Unchecked
-                            : on == total ? CheckState.Checked
-                            : CheckState.Indeterminate;
+            var allOn = total > 0 && on == total;
 
-            // Header row: tri-state checkbox + group label + child count.
-            if (TriStateCheckbox.Draw($"##group_{groupName}", parentState))
+            // Header row: parent checkbox + group label + child count.
+            // Clicking when checked → turn all off; clicking when unchecked → turn all on.
+            var parentChecked = allOn;
+            if (ImGui.Checkbox($"##group_{groupName}", ref parentChecked))
             {
-                var setTo = parentState == CheckState.Unchecked;
+                var setTo = !allOn;
                 foreach (var (group, field, _, _) in Groups)
                 {
                     if (group != groupName) continue;
