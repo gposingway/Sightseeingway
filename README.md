@@ -80,7 +80,7 @@ Contributions are welcome! Please feel free to fork the repository, make your ch
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE.md).
+This project is licensed under the [GNU Affero General Public License v3.0 or later](LICENSE.md) (AGPL-3.0-or-later).
 
 -----
 
