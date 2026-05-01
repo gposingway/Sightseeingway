@@ -29,6 +29,7 @@ No more generic screenshot names like `ffxiv_001.png`!  Sightseeingway helps you
   * **Customizable Timestamp Formats:** Choose between compact, regular, or readable date-time formats.
   * **Configurable Filename Elements:** Select which information appears in your filenames.
   * **Element Reordering:** Arrange filename elements in your preferred order (Timestamp will always be first).
+  * **Embedded Metadata** *(new in 1.3)*: Optionally embed a structured JSON record of character, location, weather, time, shader, and state flags directly into each PNG (`iTXt` chunk) or JPEG (XMP packet). Per-field opt-in with privacy-respecting defaults. See the [v1 schema](docs/schema/v1.md).
   * **Lightweight and Easy to Use:**  Simple drop-in addon with no complex configurations.
 
 ## Installation
@@ -66,13 +67,45 @@ Example: `20250506103045123-WolOfLight-LimsaLominsaUpperDecks (10.5,15.2)-Day-Cl
 
 ## Configuration
 
-Access the configuration window using the `/sightseeingway` chat command. Here you can:
+Access the configuration window using the `/sightseeingway` chat command. The window has two columns:
 
+**Filename** (left):
 *   Enable or disable individual filename elements.
 *   Reorder the elements (Note: Timestamp will always remain as the first element).
 *   Select your preferred timestamp format (Compact, Regular, or Readable).
-*   Toggle debug mode for troubleshooting (if needed).
 *   See a live preview of the filename format.
+
+**Metadata** (right) — opt-in:
+*   Toggle the master "Embed metadata in screenshot files" switch.
+*   Pick which fields get embedded, grouped by **Scene** (location, time, weather, flags, shader), **Character** (name, world, race/tribe/sex, job/level, title, mount/minion), and **Affiliation** (free company, grand company).
+*   Group-level tri-state checkboxes flip an entire group at once.
+*   See a live preview of the JSON payload that would be embedded.
+
+**Diagnostics** (bottom):
+*   Pick logging verbosity: **Quiet** (errors only), **Status** (default; rename + metadata milestones in chat), or **Debug** (full pipeline trace).
+*   Watch live pipeline status and recent events.
+*   "Open Log Folder" / "Copy Diagnostic Snapshot" for support.
+
+## Embedded metadata
+
+When opted in, Sightseeingway writes a structured JSON document into each
+screenshot file under the schema discriminator `sightseeingway/v1`. The
+record describes character, location, time, weather, shader, and state
+flags at the moment the screenshot was taken. Files become self-describing
+through any rename, copy, or cloud-sync round-trip.
+
+| Format | Storage location | Identifier |
+|---|---|---|
+| PNG | `iTXt` chunk | Keyword: `Sightseeingway` |
+| JPEG | XMP packet inside an APP1 segment | Namespace: `https://gposingway.github.io/Sightseeingway/schema/v1` |
+
+The schema is locked tolerant-reader: every field is optional, and v1
+will only ever gain new optional fields. Readers ignore what they don't
+recognise. Full reference: [`docs/schema/v1.md`](docs/schema/v1.md).
+
+A correlation ID (GUID v7) accompanies every embedded payload and links
+the file back to entries in the local pipeline log under
+`<PluginConfigDir>/logs/`, useful for diagnostics.
 
 ## Contributing
 
