@@ -1,6 +1,7 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
+using Sightseeingway.Metadata;
 using Sightseeingway.Services;
 using Sightseeingway.UI.Components;
 using System;
@@ -13,13 +14,23 @@ namespace Sightseeingway
         private readonly Configuration config;
         private Configuration tempConfig = null!;
 
+        // Filename column
         private readonly TimestampFormatSelector timestampSelector;
         private readonly FieldOrderingComponent fieldOrdering;
         private readonly FilenamePreviewComponent filenamePreview;
 
-        private bool configChanged;
+        // Metadata column
+        private readonly MetadataConfigComponent metadataConfig;
+        private readonly MetadataPreviewComponent metadataPreview;
 
-        public ConfigWindow(Configuration config) : base(Constants.Plugin.Name + " Configuration")
+        // Diagnostics
+        private readonly DiagnosticsComponent diagnostics;
+
+        // State
+        private bool configChanged;
+        private const string BaseTitle = "Sightseeingway Configuration";
+
+        public ConfigWindow(Configuration config) : base(BaseTitle)
         {
             this.config = config;
             CopyConfigToTemp();
@@ -31,33 +42,168 @@ namespace Sightseeingway
             timestampSelector = new TimestampFormatSelector();
             fieldOrdering = new FieldOrderingComponent(tempConfig.SelectedFields);
             filenamePreview = new FilenamePreviewComponent();
+            metadataConfig = new MetadataConfigComponent();
+            metadataPreview = new MetadataPreviewComponent();
+            diagnostics = new DiagnosticsComponent();
         }
 
         public override void OnOpen()
         {
-            // Reset to last-saved values whenever the window is opened.
             CopyConfigToTemp();
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
-            UpdateFilenamePreview();
+            RefreshPreviews();
+            configChanged = false;
+            WindowName = BaseTitle + "###SightseeingwayConfig";
+        }
+
+        public override void PreDraw()
+        {
+            // Asterisk in window title when there are unsaved changes.
+            WindowName = (configChanged ? BaseTitle + " *" : BaseTitle) + "###SightseeingwayConfig";
         }
 
         private void CopyConfigToTemp()
         {
-#pragma warning disable CS0618 // intermediate UI still surfaces the legacy toggles; Track C replaces this.
             tempConfig = new Configuration
             {
                 Version = config.Version,
                 SelectedFields = config.SelectedFields,
                 TimestampFormat = config.TimestampFormat,
+                EmbedMetadata = config.EmbedMetadata,
+                MetadataFields = new System.Collections.Generic.Dictionary<string, bool>(config.MetadataFields),
                 LogVerbosity = config.LogVerbosity,
-                DebugMode = config.DebugMode,
-                ShowNameChangesInChat = config.ShowNameChangesInChat
             };
-#pragma warning restore CS0618
         }
 
-        private void UpdateFilenamePreview()
+        public override void Draw()
         {
+            // Reserve room at the bottom for the diagnostics + button rows.
+            const float reservedHeight = 280f;
+            var availableY = Math.Max(120f, ImGui.GetContentRegionAvail().Y - reservedHeight);
+
+            if (ImGui.BeginTable("##MainTwoColumn", 2, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame))
+            {
+                ImGui.TableNextRow();
+
+                // Left column — Filename
+                ImGui.TableNextColumn();
+                ImGui.BeginChild("##FilenameColumn", new Vector2(0, availableY), false);
+                if (DrawFilenameColumn()) configChanged = true;
+                ImGui.EndChild();
+
+                // Right column — Metadata
+                ImGui.TableNextColumn();
+                ImGui.BeginChild("##MetadataColumn", new Vector2(0, availableY), false);
+                if (metadataConfig.Render(tempConfig)) configChanged = true;
+                ImGui.EndChild();
+
+                ImGui.EndTable();
+            }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            filenamePreview.Render();
+            metadataPreview.Render();
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            if (diagnostics.Render(tempConfig)) configChanged = true;
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            DrawButtonRow();
+
+            // Refresh previews if anything changed during this draw.
+            if (configChanged)
+            {
+                tempConfig.SelectedFields = fieldOrdering.GetSelectedFieldsString();
+                RefreshPreviews();
+            }
+        }
+
+        private bool DrawFilenameColumn()
+        {
+            var changed = false;
+
+            var format = tempConfig.TimestampFormat;
+            if (timestampSelector.Render(ref format))
+            {
+                tempConfig.TimestampFormat = format;
+                changed = true;
+            }
+
+            ImGui.Spacing();
+            ImGui.Separator();
+            ImGui.Spacing();
+
+            if (fieldOrdering.Render()) changed = true;
+
+            return changed;
+        }
+
+        private void DrawButtonRow()
+        {
+            var windowWidth = ImGui.GetWindowWidth();
+            var buttonWidth = (windowWidth - Constants.UI.ButtonRowMargin) / 3;
+            var buttonSize = new Vector2(buttonWidth, Constants.UI.ButtonHeight);
+
+            var dirty = configChanged;
+
+            // Save button — amber tint when dirty, disabled when clean.
+            ImGui.BeginDisabled(!dirty);
+            if (dirty)
+            {
+                ImGui.PushStyleColor(ImGuiCol.Button, Constants.UI.SaveDirtyTint);
+                ImGui.PushStyleColor(ImGuiCol.ButtonHovered, Constants.UI.SaveDirtyHover);
+            }
+
+            if (ImGui.Button("Save Settings", buttonSize))
+            {
+                // Reset visual state synchronously, before any I/O.
+                configChanged = false;
+                ApplyChanges();
+                config.Save();
+                Plugin.Logger?.UserMessage("Settings saved successfully!");
+                IsOpen = false;
+            }
+
+            if (dirty) ImGui.PopStyleColor(2);
+            ImGui.EndDisabled();
+
+            ImGui.SameLine(0, Constants.UI.ButtonGap);
+
+            ImGui.BeginDisabled(!dirty);
+            if (ImGui.Button("Revert Changes", buttonSize))
+            {
+                CopyConfigToTemp();
+                fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
+                RefreshPreviews();
+                configChanged = false;
+                Plugin.Logger?.UserMessage("Changes reverted to last saved settings.");
+            }
+            ImGui.EndDisabled();
+
+            ImGui.SameLine(0, Constants.UI.ButtonGap);
+
+            if (ImGui.Button("Reset to Defaults", buttonSize))
+            {
+                ResetToDefaults();
+                RefreshPreviews();
+                configChanged = true;
+                Plugin.Logger?.UserMessage("Settings reset to defaults.");
+            }
+        }
+
+        private void RefreshPreviews()
+        {
+            // Filename preview — derives from live game state when in-game,
+            // sensible defaults otherwise.
             string character;
             try
             {
@@ -95,9 +241,9 @@ namespace Sightseeingway
                                 (int)MathF.Round(mapCoords.Y * 10f, 1) / 10f,
                                 (int)MathF.Round(mapCoords.Z * 10f, 1) / 10f
                             );
-                            position = roundedCoords.Z == 0 ?
-                                $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0})" :
-                                $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0},{roundedCoords.Z:0.0})";
+                            position = roundedCoords.Z == 0
+                                ? $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0})"
+                                : $" ({roundedCoords.X:0.0},{roundedCoords.Y:0.0},{roundedCoords.Z:0.0})";
                         }
                     }
 
@@ -113,151 +259,47 @@ namespace Sightseeingway
             filenamePreview.RefreshPreview(
                 tempConfig.TimestampFormat,
                 fieldOrdering.GetActiveFieldsInOrder(),
-                character,
-                map,
-                position,
-                eorzeaTime,
-                weather,
-                shaderPreset
-            );
-        }
+                character, map, position, eorzeaTime, weather, shaderPreset);
 
-        public override void Draw()
-        {
-            configChanged = false;
-
-            // BeginChild/EndChild must be matched regardless of return value.
-            ImGui.BeginChild(
-                "##MainScrollingArea",
-                new Vector2(-1, ImGui.GetContentRegionAvail().Y - Constants.UI.ButtonRowReservedHeight),
-                true);
-
-            var format = tempConfig.TimestampFormat;
-            if (timestampSelector.Render(ref format))
+            // Metadata preview — uses live state when available, otherwise example data.
+            StateSnapshot snapshot;
+            if (Plugin.ClientState.IsLoggedIn && Plugin.ObjectTable.LocalPlayer != null)
             {
-                tempConfig.TimestampFormat = format;
-                configChanged = true;
+                try { snapshot = StateCapture.Capture(Guid.CreateVersion7()); }
+                catch { snapshot = MetadataPreviewComponent.ExampleSnapshot(); }
             }
-
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
-
-            configChanged |= fieldOrdering.Render();
-
-            ImGui.EndChild();
-
-            ImGui.Spacing();
-            filenamePreview.Render();
-            ImGui.Spacing();
-
-            ImGui.TextColored(Constants.UI.SectionAccentColor, "Notification Settings");
-            ImGui.Spacing();
-
-#pragma warning disable CS0618 // Track C replaces this section with the Diagnostics panel.
-            var showNameChangesInChat = tempConfig.ShowNameChangesInChat;
-            if (ImGui.Checkbox("Show name changes in chat window", ref showNameChangesInChat))
+            else
             {
-                tempConfig.ShowNameChangesInChat = showNameChangesInChat;
-                configChanged = true;
+                snapshot = MetadataPreviewComponent.ExampleSnapshot();
             }
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.Text("Shows a message in the chat window when a screenshot is renamed.");
-                ImGui.Text("Disable this if you don't want to see these notifications.");
-                ImGui.EndTooltip();
-            }
-
-            ImGui.SameLine(ImGui.GetWindowWidth() * Constants.UI.DebugCheckboxOffsetRatio);
-
-            var debugMode = tempConfig.DebugMode;
-            if (ImGui.Checkbox("Debug Mode", ref debugMode))
-            {
-                tempConfig.DebugMode = debugMode;
-                configChanged = true;
-            }
-#pragma warning restore CS0618
-            if (ImGui.IsItemHovered())
-            {
-                ImGui.BeginTooltip();
-                ImGui.Text("Enables additional logging and debug information.");
-                ImGui.Text("This may affect performance but helps with troubleshooting.");
-                ImGui.EndTooltip();
-            }
-
-            ImGui.Spacing();
-
-            var windowWidth = ImGui.GetWindowWidth();
-            var buttonWidth = (windowWidth - Constants.UI.ButtonRowMargin) / 3;
-            var buttonSize = new Vector2(buttonWidth, Constants.UI.ButtonHeight);
-
-            if (ImGui.Button("Save Settings", buttonSize))
-            {
-                ApplyChanges();
-                config.Save();
-                Plugin.Logger?.UserMessage("Settings saved successfully!");
-                IsOpen = false;
-            }
-
-            ImGui.SameLine(0, Constants.UI.ButtonGap);
-
-            if (ImGui.Button("Revert Changes", buttonSize))
-            {
-                CopyConfigToTemp();
-                fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
-                UpdateFilenamePreview();
-                Plugin.Logger?.UserMessage("Changes reverted to last saved settings.");
-            }
-
-            ImGui.SameLine(0, Constants.UI.ButtonGap);
-
-            if (ImGui.Button("Reset to Defaults", buttonSize))
-            {
-                ResetToDefaults();
-                UpdateFilenamePreview();
-                Plugin.Logger?.UserMessage("Settings reset to defaults.");
-            }
-
-            if (configChanged)
-            {
-                tempConfig.SelectedFields = fieldOrdering.GetSelectedFieldsString();
-                UpdateFilenamePreview();
-            }
+            metadataPreview.RefreshPreview(snapshot, tempConfig);
         }
 
         private void ApplyChanges()
         {
-#pragma warning disable CS0618 // intermediate UI; Track C replaces this section with the Diagnostics panel.
             config.SelectedFields = fieldOrdering.GetSelectedFieldsString();
             config.TimestampFormat = tempConfig.TimestampFormat;
-            config.ShowNameChangesInChat = tempConfig.ShowNameChangesInChat;
-            config.DebugMode = tempConfig.DebugMode;
+            config.EmbedMetadata = tempConfig.EmbedMetadata;
+            config.MetadataFields = new System.Collections.Generic.Dictionary<string, bool>(tempConfig.MetadataFields);
 
-            // Derive LogVerbosity from the legacy toggles until the Diagnostics panel ships.
-            var newVerbosity = tempConfig.DebugMode
-                ? LogVerbosity.Debug
-                : (tempConfig.ShowNameChangesInChat ? LogVerbosity.Status : LogVerbosity.Quiet);
+            var verbosityChanged = config.LogVerbosity != tempConfig.LogVerbosity;
+            config.LogVerbosity = tempConfig.LogVerbosity;
 
-            if (config.LogVerbosity != newVerbosity)
+            if (verbosityChanged)
             {
-                config.LogVerbosity = newVerbosity;
-                Plugin.Logger?.SetVerbosity(newVerbosity);
-                Plugin.Logger?.UserMessage($"Logging verbosity: {newVerbosity}");
+                Plugin.Logger?.SetVerbosity(config.LogVerbosity);
+                Plugin.Logger?.UserMessage($"Logging verbosity: {config.LogVerbosity}");
             }
-#pragma warning restore CS0618
         }
 
         private void ResetToDefaults()
         {
-#pragma warning disable CS0618
             tempConfig.SelectedFields = Configuration.GetDefaultSelectedFields();
             tempConfig.TimestampFormat = TimestampFormat.Compact;
-            tempConfig.DebugMode = false;
-            tempConfig.ShowNameChangesInChat = true;
+            tempConfig.EmbedMetadata = false;
+            tempConfig.MetadataFields = Configuration.DefaultMetadataFields();
             tempConfig.LogVerbosity = LogVerbosity.Status;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
-#pragma warning restore CS0618
         }
 
         // Required by Window's IDisposable contract; nothing managed to release here.

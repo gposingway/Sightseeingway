@@ -47,7 +47,10 @@ namespace Sightseeingway
         // UI Settings
         public static class UI
         {
-            public static readonly Vector2 DefaultWindowSize = new(550, 600);
+            public static readonly Vector2 DefaultWindowSize = new(880, 660);
+
+            public static readonly Vector4 SaveDirtyTint = new(0.85f, 0.55f, 0.10f, 1.0f);
+            public static readonly Vector4 SaveDirtyHover = new(0.95f, 0.65f, 0.20f, 1.0f);
             public static readonly Vector4 HeaderColor = new(0.7f, 0.9f, 1.0f, 1.0f);
             public static readonly Vector4 SectionAccentColor = new(0.0f, 0.85f, 1.0f, 1.0f);
             public static readonly Vector4 FieldHeaderColor = new(1.0f, 0.85f, 0.0f, 1.0f);
