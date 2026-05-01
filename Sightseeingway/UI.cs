@@ -1,6 +1,7 @@
 using Dalamud.Bindings.ImGui;
 using Dalamud.Interface.Windowing;
 using Dalamud.Utility;
+using Sightseeingway.Services;
 using Sightseeingway.UI.Components;
 using System;
 using System.Numerics;
@@ -42,14 +43,17 @@ namespace Sightseeingway
 
         private void CopyConfigToTemp()
         {
+#pragma warning disable CS0618 // intermediate UI still surfaces the legacy toggles; Track C replaces this.
             tempConfig = new Configuration
             {
                 Version = config.Version,
                 SelectedFields = config.SelectedFields,
                 TimestampFormat = config.TimestampFormat,
+                LogVerbosity = config.LogVerbosity,
                 DebugMode = config.DebugMode,
                 ShowNameChangesInChat = config.ShowNameChangesInChat
             };
+#pragma warning restore CS0618
         }
 
         private void UpdateFilenamePreview()
@@ -150,6 +154,7 @@ namespace Sightseeingway
             ImGui.TextColored(Constants.UI.SectionAccentColor, "Notification Settings");
             ImGui.Spacing();
 
+#pragma warning disable CS0618 // Track C replaces this section with the Diagnostics panel.
             var showNameChangesInChat = tempConfig.ShowNameChangesInChat;
             if (ImGui.Checkbox("Show name changes in chat window", ref showNameChangesInChat))
             {
@@ -172,6 +177,7 @@ namespace Sightseeingway
                 tempConfig.DebugMode = debugMode;
                 configChanged = true;
             }
+#pragma warning restore CS0618
             if (ImGui.IsItemHovered())
             {
                 ImGui.BeginTooltip();
@@ -222,28 +228,36 @@ namespace Sightseeingway
 
         private void ApplyChanges()
         {
+#pragma warning disable CS0618 // intermediate UI; Track C replaces this section with the Diagnostics panel.
             config.SelectedFields = fieldOrdering.GetSelectedFieldsString();
             config.TimestampFormat = tempConfig.TimestampFormat;
             config.ShowNameChangesInChat = tempConfig.ShowNameChangesInChat;
-
-            var debugModeChanged = config.DebugMode != tempConfig.DebugMode;
             config.DebugMode = tempConfig.DebugMode;
 
-            if (debugModeChanged)
+            // Derive LogVerbosity from the legacy toggles until the Diagnostics panel ships.
+            var newVerbosity = tempConfig.DebugMode
+                ? LogVerbosity.Debug
+                : (tempConfig.ShowNameChangesInChat ? LogVerbosity.Status : LogVerbosity.Quiet);
+
+            if (config.LogVerbosity != newVerbosity)
             {
-                Plugin.DebugMode = config.DebugMode;
-                Plugin.Logger?.SetDebugMode(config.DebugMode);
-                Plugin.Logger?.UserMessage($"Debug mode {(config.DebugMode ? "enabled" : "disabled")}");
+                config.LogVerbosity = newVerbosity;
+                Plugin.Logger?.SetVerbosity(newVerbosity);
+                Plugin.Logger?.UserMessage($"Logging verbosity: {newVerbosity}");
             }
+#pragma warning restore CS0618
         }
 
         private void ResetToDefaults()
         {
+#pragma warning disable CS0618
             tempConfig.SelectedFields = Configuration.GetDefaultSelectedFields();
             tempConfig.TimestampFormat = TimestampFormat.Compact;
             tempConfig.DebugMode = false;
             tempConfig.ShowNameChangesInChat = true;
+            tempConfig.LogVerbosity = LogVerbosity.Status;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
+#pragma warning restore CS0618
         }
 
         // Required by Window's IDisposable contract; nothing managed to release here.

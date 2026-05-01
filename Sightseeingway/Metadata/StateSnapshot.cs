@@ -1,0 +1,123 @@
+using Newtonsoft.Json;
+using System;
+using System.Collections.Generic;
+
+namespace Sightseeingway.Metadata
+{
+    /// <summary>
+    /// Immutable record of all game state captured at the moment closest to a
+    /// screenshot. Once constructed it holds only resolved values (localized
+    /// names, integer IDs, normalized strings) — no live game-object references —
+    /// so it is safe to read from any thread.
+    ///
+    /// Serializes to the v1 metadata schema documented in docs/schema/v1.md.
+    /// </summary>
+    public sealed record StateSnapshot
+    {
+        [JsonProperty("schema", Order = 0)]
+        public string Schema => "sightseeingway/v1";
+
+        [JsonProperty("correlationId", Order = 1)]
+        public Guid CorrelationId { get; init; }
+
+        [JsonProperty("timestamp", Order = 2)]
+        public DateTime Timestamp { get; init; }
+
+        [JsonProperty("character", NullValueHandling = NullValueHandling.Ignore, Order = 3)]
+        public CharacterInfo? Character { get; init; }
+
+        [JsonProperty("freeCompany", NullValueHandling = NullValueHandling.Ignore, Order = 4)]
+        public FreeCompanyInfo? FreeCompany { get; init; }
+
+        [JsonProperty("location", NullValueHandling = NullValueHandling.Ignore, Order = 5)]
+        public LocationInfo? Location { get; init; }
+
+        [JsonProperty("time", NullValueHandling = NullValueHandling.Ignore, Order = 6)]
+        public TimeInfo? Time { get; init; }
+
+        [JsonProperty("weather", NullValueHandling = NullValueHandling.Ignore, Order = 7)]
+        public NamedId? Weather { get; init; }
+
+        [JsonProperty("shader", NullValueHandling = NullValueHandling.Ignore, Order = 8)]
+        public ShaderInfo? Shader { get; init; }
+
+        [JsonProperty("flags", NullValueHandling = NullValueHandling.Ignore, Order = 9)]
+        public IReadOnlyList<string>? Flags { get; init; }
+    }
+
+    public sealed record NamedId(
+        [property: JsonProperty("id")] uint Id,
+        [property: JsonProperty("name")] string Name);
+
+    public sealed record CharacterInfo
+    {
+        [JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)]
+        public string? Name { get; init; }
+
+        [JsonProperty("world", NullValueHandling = NullValueHandling.Ignore)]
+        public WorldInfo? World { get; init; }
+
+        [JsonProperty("race", NullValueHandling = NullValueHandling.Ignore)]
+        public NamedId? Race { get; init; }
+
+        [JsonProperty("tribe", NullValueHandling = NullValueHandling.Ignore)]
+        public NamedId? Tribe { get; init; }
+
+        [JsonProperty("sex", NullValueHandling = NullValueHandling.Ignore)]
+        public string? Sex { get; init; }
+
+        [JsonProperty("job", NullValueHandling = NullValueHandling.Ignore)]
+        public JobInfo? Job { get; init; }
+
+        [JsonProperty("title", NullValueHandling = NullValueHandling.Ignore)]
+        public string? Title { get; init; }
+
+        [JsonProperty("grandCompany", NullValueHandling = NullValueHandling.Ignore)]
+        public GrandCompanyInfo? GrandCompany { get; init; }
+
+        [JsonProperty("mount", NullValueHandling = NullValueHandling.Ignore)]
+        public NamedId? Mount { get; init; }
+
+        [JsonProperty("minion", NullValueHandling = NullValueHandling.Ignore)]
+        public NamedId? Minion { get; init; }
+    }
+
+    public sealed record WorldInfo(
+        [property: JsonProperty("current", NullValueHandling = NullValueHandling.Ignore)] string? Current,
+        [property: JsonProperty("home", NullValueHandling = NullValueHandling.Ignore)] string? Home);
+
+    public sealed record JobInfo(
+        [property: JsonProperty("id")] uint Id,
+        [property: JsonProperty("name")] string Name,
+        [property: JsonProperty("level")] int Level);
+
+    public sealed record GrandCompanyInfo(
+        [property: JsonProperty("id")] uint Id,
+        [property: JsonProperty("name")] string Name,
+        [property: JsonProperty("rank", NullValueHandling = NullValueHandling.Ignore)] string? Rank);
+
+    public sealed record FreeCompanyInfo(
+        [property: JsonProperty("name", NullValueHandling = NullValueHandling.Ignore)] string? Name,
+        [property: JsonProperty("tag", NullValueHandling = NullValueHandling.Ignore)] string? Tag);
+
+    public sealed record LocationInfo(
+        [property: JsonProperty("territory", NullValueHandling = NullValueHandling.Ignore)] NamedId? Territory,
+        [property: JsonProperty("map", NullValueHandling = NullValueHandling.Ignore)] NamedId? Map,
+        [property: JsonProperty("position", NullValueHandling = NullValueHandling.Ignore)] Position? Position);
+
+    public sealed record Position(
+        [property: JsonProperty("x")] float X,
+        [property: JsonProperty("y")] float Y,
+        [property: JsonProperty("z")] float Z);
+
+    public sealed record TimeInfo(
+        [property: JsonProperty("eorzea", NullValueHandling = NullValueHandling.Ignore)] EorzeaTime? Eorzea);
+
+    public sealed record EorzeaTime(
+        [property: JsonProperty("period")] string Period,
+        [property: JsonProperty("hour")] int Hour);
+
+    public sealed record ShaderInfo(
+        [property: JsonProperty("collection", NullValueHandling = NullValueHandling.Ignore)] string? Collection,
+        [property: JsonProperty("preset", NullValueHandling = NullValueHandling.Ignore)] string? Preset);
+}

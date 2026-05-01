@@ -4,153 +4,144 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using Dalamud.Game.Text;
 using Dalamud.Game.Text.SeStringHandling;
-using Dalamud.Game.Text.SeStringHandling.Payloads;
 
 namespace Sightseeingway.Services
 {
     /// <summary>
-    /// Provides unified logging functionality for the application
+    /// Provides unified logging functionality for the application.
+    ///
+    /// Every level method accepts an optional <see cref="Guid"/> correlation
+    /// ID; when present it is rendered into the message prefix as
+    /// <c>id=...</c> for cross-thread, cross-file traceability of a single
+    /// screenshot's pipeline lifecycle.
     /// </summary>
     public class Logger
     {
         private readonly IPluginLog? _log;
         private readonly IChatGui? _chatGui;
-        private bool _debugMode; // Removed readonly modifier to allow it to be changed
+        private LogVerbosity _verbosity;
 
-        public Logger(IPluginLog? log, IChatGui? chatGui, bool debugMode = false)
+        public Logger(IPluginLog? log, IChatGui? chatGui, LogVerbosity verbosity = LogVerbosity.Status)
         {
             _log = log;
             _chatGui = chatGui;
-            _debugMode = debugMode;
+            _verbosity = verbosity;
         }
 
-        /// <summary>
-        /// Logs a debug message to the Dalamud log
-        /// </summary>
-        public void Debug(string message, 
-            [CallerFilePath] string filePath = "", 
-            [CallerLineNumber] int lineNumber = 0, 
+        public LogVerbosity Verbosity => _verbosity;
+
+        public void SetVerbosity(LogVerbosity verbosity) => _verbosity = verbosity;
+
+        public void Debug(string message,
+            Guid? correlationId = null,
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0,
             [CallerMemberName] string caller = "")
         {
-            string locationInfo = FormatLocationInfo(filePath, lineNumber, caller);
-            _log?.Debug($"{locationInfo}{message}");
+            var prefix = FormatPrefix(filePath, lineNumber, caller, correlationId);
+            _log?.Debug($"{prefix}{message}");
 
-            if (_debugMode)
+            if (_verbosity == LogVerbosity.Debug)
+                SafePrintToChat($"Debug: {message} {prefix}");
+        }
+
+        public void Information(string message,
+            Guid? correlationId = null,
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0,
+            [CallerMemberName] string caller = "")
+        {
+            var prefix = FormatPrefix(filePath, lineNumber, caller, correlationId);
+            _log?.Information($"{prefix}{message}");
+
+            if (_verbosity == LogVerbosity.Debug)
+                SafePrintToChat($"Info: {message} {prefix}");
+        }
+
+        public void Warning(string message,
+            bool showInChat = false,
+            Guid? correlationId = null,
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0,
+            [CallerMemberName] string caller = "")
+        {
+            var prefix = FormatPrefix(filePath, lineNumber, caller, correlationId);
+            _log?.Warning($"{prefix}{message}");
+
+            // Status: respect showInChat. Debug: always. Quiet: log only.
+            var shouldShow = _verbosity switch
             {
-                SafePrintToChat($"Debug: {message} {locationInfo}");
-            }
-        }
+                LogVerbosity.Debug => true,
+                LogVerbosity.Status => showInChat,
+                _ => false,
+            };
 
-        /// <summary>
-        /// Logs an informational message
-        /// </summary>
-        public void Information(string message, 
-            [CallerFilePath] string filePath = "", 
-            [CallerLineNumber] int lineNumber = 0, 
-            [CallerMemberName] string caller = "")
-        {
-            string locationInfo = FormatLocationInfo(filePath, lineNumber, caller);
-            _log?.Information($"{locationInfo}{message}");
-            
-            // If debug mode is enabled, also print to chat
-            if (_debugMode)
-            {
-                SafePrintToChat($"Info: {message} {locationInfo}");
-            }
-        }
-
-        /// <summary>
-        /// Logs a warning message and optionally displays it in chat
-        /// </summary>
-        public void Warning(string message, bool showInChat = false, 
-            [CallerFilePath] string filePath = "", 
-            [CallerLineNumber] int lineNumber = 0, 
-            [CallerMemberName] string caller = "")
-        {
-            string locationInfo = FormatLocationInfo(filePath, lineNumber, caller);
-            _log?.Warning($"{locationInfo}{message}");
-            
-            // Always show in chat if debug mode is enabled, otherwise respect the showInChat parameter
-            if ((_debugMode || showInChat) && _chatGui != null)
+            if (shouldShow && _chatGui != null)
             {
                 try
                 {
-                    _chatGui.PrintError($"{Constants.Plugin.ChatPrefix} Warning: {message} {locationInfo}");
+                    _chatGui.PrintError($"{Constants.Plugin.ChatPrefix} Warning: {message} {prefix}");
                 }
-                catch
-                {
-                    // Silently fail if we can't print
-                }
+                catch { /* never throw from logging */ }
             }
         }
 
-        /// <summary>
-        /// Logs an error message and optionally displays it in chat
-        /// </summary>
-        public void Error(string message, Exception? ex = null, bool showInChat = true, 
-            [CallerFilePath] string filePath = "", 
-            [CallerLineNumber] int lineNumber = 0, 
+        public void Error(string message,
+            Exception? ex = null,
+            bool showInChat = true,
+            Guid? correlationId = null,
+            [CallerFilePath] string filePath = "",
+            [CallerLineNumber] int lineNumber = 0,
             [CallerMemberName] string caller = "")
         {
-            string locationInfo = FormatLocationInfo(filePath, lineNumber, caller);
-            
+            var prefix = FormatPrefix(filePath, lineNumber, caller, correlationId);
+
             if (ex != null)
             {
-                _log?.Error($"{locationInfo}{message}: {ex}");
-                
-                // In debug mode, include exception details in chat
-                if (_debugMode)
-                {
+                _log?.Error($"{prefix}{message}: {ex}");
+                if (_verbosity == LogVerbosity.Debug)
                     message = $"{message}: {ex.Message}";
-                }
             }
             else
             {
-                _log?.Error($"{locationInfo}{message}");
+                _log?.Error($"{prefix}{message}");
             }
-            
-            // Always show in chat if debug mode is enabled, otherwise respect the showInChat parameter
-            if ((_debugMode || showInChat) && _chatGui != null)
+
+            // Errors always show unless verbosity is Quiet AND caller didn't ask.
+            var shouldShow = _verbosity != LogVerbosity.Quiet || showInChat;
+
+            if (shouldShow && _chatGui != null)
             {
                 try
                 {
-                    _chatGui.PrintError($"{Constants.Plugin.ChatPrefix} Error: {message} {locationInfo}");
+                    _chatGui.PrintError($"{Constants.Plugin.ChatPrefix} Error: {message} {prefix}");
                 }
-                catch
-                {
-                    // Silently fail if we can't print
-                }
+                catch { /* never throw from logging */ }
             }
         }
 
         /// <summary>
-        /// Prints a message to the game chat for user feedback
+        /// User-facing chat message. Always shown unless verbosity is Quiet.
         /// </summary>
         public void UserMessage(string message)
         {
+            if (_verbosity == LogVerbosity.Quiet) return;
             SafePrintToChat(message);
         }
 
-        /// <summary>
-        /// Sets the debug mode which controls whether debug messages are shown in chat
-        /// </summary>
-        public void SetDebugMode(bool enabled)
+        private static string FormatPrefix(string filePath, int lineNumber, string caller, Guid? id)
         {
-            _debugMode = enabled;
-        }
-        
-        /// <summary>
-        /// Formats location information from caller attributes
-        /// </summary>
-        private string FormatLocationInfo(string filePath, int lineNumber, string caller)
-        {
-            if (string.IsNullOrEmpty(filePath) && lineNumber == 0 && string.IsNullOrEmpty(caller))
+            if (string.IsNullOrEmpty(filePath) && lineNumber == 0 && string.IsNullOrEmpty(caller) && id == null)
                 return string.Empty;
-                
-            string fileName = Path.GetFileName(filePath);
-            return $"[{fileName}:{lineNumber} in {caller}] ";
+
+            var fileName = string.IsNullOrEmpty(filePath) ? string.Empty : Path.GetFileName(filePath);
+            var location = string.IsNullOrEmpty(fileName)
+                ? string.Empty
+                : $"[{fileName}:{lineNumber} in {caller}] ";
+
+            return id.HasValue ? $"[id={id.Value:D}] {location}" : location;
         }
-        
+
         private void SafePrintToChat(string message)
         {
             if (_chatGui == null) return;
@@ -169,10 +160,7 @@ namespace Sightseeingway.Services
                     Type = XivChatType.Debug,
                 });
             }
-            catch
-            {
-                // Silently fail if we can't print
-            }
+            catch { /* never throw from logging */ }
         }
     }
 }

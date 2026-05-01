@@ -1,15 +1,15 @@
-using System.IO;
-using System;
-using System.Numerics;
-using System.Threading;
-using Lumina.Excel.Sheets;
-using Dalamud.Utility;
-using System.Collections.Generic;
 using Newtonsoft.Json;
-using System.Diagnostics;
-using System.Collections.Concurrent;
-using System.Linq;
+using Sightseeingway.Metadata;
 using Sightseeingway.Results;
+using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace Sightseeingway
 {
@@ -18,6 +18,8 @@ namespace Sightseeingway
         public static string? CurrentPresetName { get; private set; }
         public static bool EffectsEnabled { get; private set; }
 
+        public static MetadataPipeline? Pipeline { get; set; }
+
         public static void SetupWatchers(List<string> foldersToMonitor, List<FileSystemWatcher> watchers)
         {
             foreach (var folder in foldersToMonitor)
@@ -25,7 +27,6 @@ namespace Sightseeingway
                 if (!Directory.Exists(folder)) continue;
 
                 var watcher = new FileSystemWatcher(folder) { EnableRaisingEvents = true };
-
                 watcher.Created += OnFileCreated;
                 watchers.Add(watcher);
             }
@@ -34,46 +35,39 @@ namespace Sightseeingway
         public static OperationResult<ShadingwayState> LoadShadingwayState(string filePath)
         {
             Plugin.Logger?.Debug($"LoadShadingwayState started for: {filePath}");
-            
+
             var waitResult = WaitForFileReleaseGeneric(filePath, FileAccess.Read);
             if (!waitResult.IsSuccess)
             {
-                return OperationResult<ShadingwayState>.Failure(waitResult.ErrorMessage ?? 
+                return OperationResult<ShadingwayState>.Failure(waitResult.ErrorMessage ??
                     $"Shadingway state file not released in time for reading: {filePath}");
             }
 
             try
             {
-                using (StreamReader file = File.OpenText(filePath))
-                using (JsonTextReader reader = new JsonTextReader(file))
-                {
-                    var serializer = new JsonSerializer();
-                    var state = serializer.Deserialize<ShadingwayState>(reader);
-                    
-                    if (state != null)
-                    {
-                        var jsonPid = state.Pid;
-                        var currentPid = Process.GetCurrentProcess().Id;
+                using var file = File.OpenText(filePath);
+                using var reader = new JsonTextReader(file);
 
-                        if (jsonPid == currentPid)
-                        {
-                            EffectsEnabled = state.Effects?.Enabled ?? false;
-                            CurrentPresetName = state.Preset?.Name;
-                            Plugin.Logger?.Debug($"Shadingway State Parsed: EffectsEnabled={EffectsEnabled}, PresetName={CurrentPresetName}");
-                        }
-                        else
-                        {
-                            EffectsEnabled = false;
-                            CurrentPresetName = null;
-                        }
-                        
-                        return OperationResult<ShadingwayState>.Success(state);
-                    }
-                    else
-                    {
-                        return OperationResult<ShadingwayState>.Failure("Failed to deserialize Shadingway state");
-                    }
+                var serializer = new JsonSerializer();
+                var state = serializer.Deserialize<ShadingwayState>(reader);
+
+                if (state == null)
+                    return OperationResult<ShadingwayState>.Failure("Failed to deserialize Shadingway state");
+
+                if (state.Pid == Process.GetCurrentProcess().Id)
+                {
+                    EffectsEnabled = state.Effects?.Enabled ?? false;
+                    CurrentPresetName = state.Preset?.Name;
+                    Plugin.Logger?.Debug(
+                        $"Shadingway State Parsed: EffectsEnabled={EffectsEnabled}, PresetName={CurrentPresetName}");
                 }
+                else
+                {
+                    EffectsEnabled = false;
+                    CurrentPresetName = null;
+                }
+
+                return OperationResult<ShadingwayState>.Success(state);
             }
             catch (Exception ex)
             {
@@ -84,22 +78,15 @@ namespace Sightseeingway
         }
 
         // Polls until the OS releases the file's exclusive lock or we exhaust the retry budget.
-        // Runs on FileSystemWatcher / Timer threadpool threads where blocking via Thread.Sleep is acceptable;
-        // a true async API would require flipping every caller (watcher events are sync delegates).
+        // Runs on FileSystemWatcher / Timer / worker threads where blocking via Thread.Sleep is acceptable.
         public static OperationResult WaitForFileReleaseGeneric(string filePath, FileAccess fileAccess = FileAccess.Read)
         {
-            Plugin.Logger?.Debug($"WaitForFileReleaseGeneric started for: {filePath}, FileAccess: {fileAccess}");
-
             for (var i = 0; i < Constants.FileOperations.MaxFileTries; ++i)
             {
                 try
                 {
-                    Plugin.Logger?.Debug($"Attempt {i + 1}/{Constants.FileOperations.MaxFileTries} to open file: {filePath}");
-                    using (var fs = File.Open(filePath, FileMode.Open, fileAccess, FileShare.ReadWrite))
-                    {
-                        Plugin.Logger?.Debug($"File opened successfully on attempt {i + 1}: {filePath}");
-                        return OperationResult.Success();
-                    }
+                    using var fs = File.Open(filePath, FileMode.Open, fileAccess, FileShare.ReadWrite);
+                    return OperationResult.Success();
                 }
                 catch (IOException)
                 {
@@ -110,8 +97,45 @@ namespace Sightseeingway
                     return OperationResult.Failure($"Error waiting for file release: {filePath}", ex);
                 }
             }
-            
-            return OperationResult.Failure($"File not released after {Constants.FileOperations.MaxFileTries} attempts: {filePath}");
+
+            return OperationResult.Failure(
+                $"File not released after {Constants.FileOperations.MaxFileTries} attempts: {filePath}");
+        }
+
+        public static OperationResult MoveFileWithRetry(string sourceFilePath, string destFilePath)
+        {
+            for (var i = 0; i < Constants.FileOperations.MaxMoveTries; ++i)
+            {
+                var waitResult = WaitForFileReleaseGeneric(sourceFilePath, FileAccess.ReadWrite);
+                if (waitResult.IsSuccess)
+                {
+                    try
+                    {
+                        File.Move(sourceFilePath, destFilePath);
+                        return OperationResult.Success();
+                    }
+                    catch (IOException ex)
+                    {
+                        if (i == Constants.FileOperations.MaxMoveTries - 1)
+                            return OperationResult.Failure(
+                                $"File locked after multiple attempts: {Path.GetFileName(sourceFilePath)}", ex);
+                        Thread.Sleep(Constants.FileOperations.MoveRetryWaitTimeMs);
+                    }
+                    catch (Exception ex)
+                    {
+                        return OperationResult.Failure(
+                            $"Error moving file: {Path.GetFileName(sourceFilePath)}", ex);
+                    }
+                }
+                else if (i == Constants.FileOperations.MaxMoveTries - 1)
+                {
+                    return OperationResult.Failure(waitResult.ErrorMessage ??
+                        $"File not released for move after {Constants.FileOperations.MaxMoveTries} attempts");
+                }
+            }
+
+            return OperationResult.Failure(
+                $"Move operation failed after {Constants.FileOperations.MaxMoveTries} attempts");
         }
 
         public static void OnFileCreated(object sender, FileSystemEventArgs e)
@@ -121,182 +145,149 @@ namespace Sightseeingway
 
             if (!Constants.FileOperations.SupportedImageExtensions.Contains(extension)) return;
 
-            Plugin.Logger?.Debug($"File Created event triggered for: {filePath}");
-
-            if (Caching.IsInRenameCache(Path.GetFileName(filePath)))
+            var fileName = Path.GetFileName(filePath);
+            if (Caching.IsInRenameCache(fileName))
             {
-                Plugin.Logger?.Debug($"File '{e.Name}' is in rename cache, ignoring.");
+                Plugin.Logger?.Debug($"File '{fileName}' is in rename cache, ignoring.");
                 return;
             }
 
-            var waitResult = WaitForFileReleaseGeneric(filePath);
-            if (waitResult.IsSuccess)
-            {
-                RenameFile(filePath);
-            }
-            else
-            {
-                Plugin.Logger?.Warning($"File not released in time for renaming: {filePath}");
-            }
-        }
+            // Skip files that already follow our timestamp-prefixed naming convention.
+            if (LooksAlreadyRenamed(fileName)) return;
 
-        public static OperationResult MoveFileWithRetry(string sourceFilePath, string destFilePath)
-        {
-            Plugin.Logger?.Debug($"MoveFileWithRetry started from: {sourceFilePath} to {destFilePath}");
-            
-            for (int i = 0; i < Constants.FileOperations.MaxMoveTries; ++i)
-            {
-                var waitResult = WaitForFileReleaseGeneric(sourceFilePath, FileAccess.ReadWrite);
-                if (waitResult.IsSuccess)
-                {
-                    try
-                    {
-                        Plugin.Logger?.Debug($"Attempt {i + 1}/{Constants.FileOperations.MaxMoveTries} to move file");
-                        File.Move(sourceFilePath, destFilePath);
-                        Plugin.Logger?.Information($"File moved successfully to: {destFilePath}");
-                        return OperationResult.Success();
-                    }
-                    catch (IOException ex)
-                    {
-                        Plugin.Logger?.Debug($"IOException during MoveFile on attempt {i + 1}: {ex.Message}");
-                        
-                        if (i == Constants.FileOperations.MaxMoveTries - 1)
-                        {
-                            return OperationResult.Failure($"File locked after multiple attempts: {Path.GetFileName(sourceFilePath)}", ex);
-                        }
-                        
-                        Thread.Sleep(Constants.FileOperations.MoveRetryWaitTimeMs);
-                    }
-                    catch (Exception ex)
-                    {
-                        return OperationResult.Failure($"Error moving file: {Path.GetFileName(sourceFilePath)}", ex);
-                    }
-                }
-                else
-                {
-                    if (i == Constants.FileOperations.MaxMoveTries - 1)
-                    {
-                        return OperationResult.Failure(waitResult.ErrorMessage ?? 
-                            $"File not released for move after {Constants.FileOperations.MaxMoveTries} attempts");
-                    }
-                }
-            }
-            
-            return OperationResult.Failure($"Move operation failed after {Constants.FileOperations.MaxMoveTries} attempts");
-        }
+            var correlationId = Guid.CreateVersion7();
+            Plugin.PipelineLog?.Info("fsw.created", correlationId, $"path={fileName}");
 
-        public static void RenameFile(string filePath)
-        {
-            Plugin.Logger?.Debug($"RenameFile started for: {filePath}");
-
+            // Pattern B: dispatch the snapshot capture to the framework tick before
+            // waiting for file release, so state reflects the moment of the event.
             Plugin.Framework.RunOnTick(() =>
             {
+                StateSnapshot snapshot;
                 try
                 {
-                    var newFilePath = ResolveNewFileName(filePath);
-                    if (newFilePath == null) return;
-
-                    Plugin.Logger?.Debug($"Renaming '{filePath}' to '{newFilePath}'");
-
-                    Caching.AddToRenameCache(Path.GetFileName(newFilePath));
-                    QueueRenameOperation(filePath, newFilePath);
-
-                    Plugin.Logger?.Debug($"Queued file for rename to: {newFilePath}");
+                    Plugin.PipelineLog?.Debug("state.capture.start", correlationId);
+                    var sw = Stopwatch.StartNew();
+                    snapshot = StateCapture.Capture(correlationId);
+                    sw.Stop();
+                    Plugin.PipelineLog?.Info("state.capture.complete", correlationId,
+                        $"duration_ms={sw.ElapsedMilliseconds}");
                 }
                 catch (Exception ex)
                 {
-                    Plugin.Logger?.Error($"Error during RenameFile for {filePath}", ex, true);
+                    Plugin.Logger?.Error(
+                        $"State capture failed for {fileName}", ex, correlationId: correlationId);
+                    return;
                 }
 
-                Plugin.Logger?.Debug($"RenameFile finished for: {filePath}");
-            }, default, 30);
+                // Hop off the framework thread for the I/O-bound rest of the work.
+                Task.Run(() => HandleNewFile(filePath, snapshot, correlationId));
+            });
         }
 
-        public static string? ResolveNewFileName(string filePath)
+        private static void HandleNewFile(string originalPath, StateSnapshot snapshot, Guid correlationId)
         {
-            var fileName = Path.GetFileName(filePath);
-            var fileExtension = Path.GetExtension(filePath).ToLowerInvariant();
-
-            if (fileName.Length >= 17 && DateTime.TryParseExact(fileName.Substring(0, 17), Constants.Formats.CompactTimestamp, null, System.Globalization.DateTimeStyles.None, out _))
+            try
             {
-                return null;
+                var waitResult = WaitForFileReleaseGeneric(originalPath);
+                if (!waitResult.IsSuccess)
+                {
+                    Plugin.PipelineLog?.Warn("wait.release.timeout", correlationId,
+                        $"path={Path.GetFileName(originalPath)}");
+                    Plugin.Logger?.Warning(
+                        $"File not released in time for renaming: {originalPath}",
+                        correlationId: correlationId);
+                    return;
+                }
+
+                var targetPath = BuildTargetPath(originalPath, snapshot, Plugin.Config);
+                if (string.Equals(targetPath, originalPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    Plugin.PipelineLog?.Debug("rename.skipped.identity", correlationId);
+                    return;
+                }
+
+                // Persist the sidecar before the rename so durability covers any crash from here on.
+                var task = new SidecarTask
+                {
+                    CorrelationId = correlationId,
+                    OriginalPath = originalPath,
+                    TargetPath = targetPath,
+                    CreatedAt = DateTime.UtcNow,
+                    Renamed = false,
+                    Injected = false,
+                    Snapshot = snapshot,
+                };
+
+                var initialSidecarPath = SidecarRepository.PathFor(originalPath);
+                var writeResult = SidecarRepository.Write(initialSidecarPath, task);
+                if (!writeResult.IsSuccess)
+                {
+                    Plugin.Logger?.Error(
+                        $"Sidecar write failed for {Path.GetFileName(originalPath)}",
+                        writeResult.Exception, correlationId: correlationId);
+                    return;
+                }
+                Plugin.PipelineLog?.Info("sidecar.write", correlationId,
+                    $"path={Path.GetFileName(initialSidecarPath)}");
+
+                // Pre-cache the target name so the FSW.Created event for the renamed file ignores it.
+                Caching.AddToRenameCache(Path.GetFileName(targetPath));
+
+                var moveResult = MoveFileWithRetry(originalPath, targetPath);
+                if (!moveResult.IsSuccess)
+                {
+                    Plugin.PipelineLog?.Error("rename.failed", correlationId,
+                        $"from={Path.GetFileName(originalPath)} to={Path.GetFileName(targetPath)} " +
+                        $"error={moveResult.ErrorMessage}");
+                    Plugin.Logger?.Error(
+                        moveResult.ErrorMessage ?? $"Unknown error renaming {Path.GetFileName(originalPath)}",
+                        moveResult.Exception, correlationId: correlationId);
+                    // Leave the sidecar so recovery can retry on next launch.
+                    return;
+                }
+
+                Plugin.PipelineLog?.Info("rename.complete", correlationId,
+                    $"from={Path.GetFileName(originalPath)} to={Path.GetFileName(targetPath)}");
+
+                // Move the sidecar to follow the file.
+                var finalSidecarPath = SidecarRepository.PathFor(targetPath);
+                SidecarRepository.Move(initialSidecarPath, finalSidecarPath);
+                Plugin.PipelineLog?.Info("sidecar.move", correlationId,
+                    $"to={Path.GetFileName(finalSidecarPath)}");
+
+                // Update the sidecar's renamed flag.
+                SidecarRepository.Write(finalSidecarPath, task.With(renamed: true));
+
+                if (Plugin.Logger != null && Plugin.Config.LogVerbosity != Services.LogVerbosity.Quiet)
+                {
+                    Plugin.Logger.UserMessage($"Screenshot renamed: {Path.GetFileName(targetPath)}");
+                }
+
+                // Wake the worker to perform metadata injection.
+                Pipeline?.Signal();
             }
-
-            var config = Plugin.Config;
-
-            var activeFieldsInOrder = FilenameGenerator.EnsureTimestampIsFirst(config.Fields);
-
-            var fileCreationTime = File.GetCreationTime(filePath);
-            
-            var character = Plugin.ObjectTable.LocalPlayer?.Name.TextValue ?? "";
-            var map = "";
-            var position = "";
-            var eorzeaTime = "";
-            var weather = "";
-            var presetNamePart = "";
-
-            if (!string.IsNullOrEmpty(character))
+            catch (Exception ex)
             {
-                var mapExcelSheet = Plugin.DataManager.GetExcelSheet<Map>();
-                if (mapExcelSheet != null && Plugin.ClientState.MapId > 0)
-                {
-                    var mapType = mapExcelSheet.GetRow(Plugin.ClientState.MapId);
-                    if (mapType.RowId > 0)
-                    {
-                        try
-                        {
-                            var placeName = mapType.PlaceName.Value;
-                            var extractedName = placeName.Name.ToString();
-                            if (!string.IsNullOrEmpty(extractedName))
-                            {
-                                map = extractedName;
-                            }
-                        }
-                        catch (Exception ex)
-                        {
-                            Plugin.Logger?.Debug($"Error extracting map name: {ex.Message}");
-                        }
-
-                        Plugin.Logger?.Debug($"Map name resolved: {map}");
-
-                        try
-                        {
-                            var playerPos = Plugin.ObjectTable.LocalPlayer?.Position ?? Vector3.Zero;
-                            var mapVector = MapUtil.WorldToMap(playerPos, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
-                            var mapPlace = new Vector3(
-                                (int)MathF.Round(mapVector.X * 10, 1) / 10f,
-                                (int)MathF.Round(mapVector.Y * 10, 1) / 10f,
-                                (int)MathF.Round(mapVector.Z * 10, 1) / 10f
-                            );
-                            position = mapPlace == Vector3.Zero ? "" :
-                                mapPlace.Z == 0.0 ? $" ({mapPlace.X:0.0},{mapPlace.Y:0.0})" :
-                                $" ({mapPlace.X:0.0},{mapPlace.Y:0.0},{mapPlace.Z:0.0})";
-                        }
-                        catch (Exception ex)
-                        {
-                            Plugin.Logger?.Debug($"Error calculating coordinates: {ex.Message}");
-                        }
-                    }
-                }
-                else
-                {
-                    Plugin.Logger?.Warning("Map sheet not found or MapId is 0.");
-                }
-
-                if (!string.IsNullOrEmpty(map))
-                {
-                    eorzeaTime = Client.GetCurrentEorzeaDateTime().DetermineDayPeriod(true);
-                    weather = Client.GetCurrentWeatherName();
-                }
+                Plugin.Logger?.Error(
+                    $"Unexpected failure handling {Path.GetFileName(originalPath)}", ex,
+                    correlationId: correlationId);
             }
+        }
 
-            if (EffectsEnabled)
-            {
-                if (!string.IsNullOrEmpty(CurrentPresetName))
-                {
-                    presetNamePart = CurrentPresetName;
-                }
-            }
+        public static string BuildTargetPath(string originalPath, StateSnapshot snapshot, Configuration config)
+        {
+            var fileExtension = Path.GetExtension(originalPath).ToLowerInvariant();
+            var fileCreationTime = File.GetCreationTime(originalPath);
+
+            var character = snapshot.Character?.Name ?? string.Empty;
+            var map = snapshot.Location?.Map?.Name ?? string.Empty;
+            var position = FormatPositionForFilename(snapshot.Location?.Position);
+            var eorzeaTime = snapshot.Time?.Eorzea?.Period ?? string.Empty;
+            var weather = snapshot.Weather?.Name ?? string.Empty;
+            var preset = snapshot.Shader?.Preset ?? string.Empty;
+            var effectsEnabled = !string.IsNullOrEmpty(preset);
+
+            var activeFields = FilenameGenerator.EnsureTimestampIsFirst(config.Fields);
 
             var constructedFilename = FilenameGenerator.GenerateFilename(
                 fileCreationTime,
@@ -306,15 +297,34 @@ namespace Sightseeingway
                 position,
                 eorzeaTime,
                 weather,
-                presetNamePart,
-                EffectsEnabled,
-                activeFieldsInOrder,
-                fileExtension
-            );
+                preset,
+                effectsEnabled,
+                activeFields,
+                fileExtension);
 
             constructedFilename = StripInvalidFileNameChars(constructedFilename);
+            return Path.Combine(Path.GetDirectoryName(originalPath) ?? string.Empty, constructedFilename);
+        }
 
-            return Path.Combine(Path.GetDirectoryName(filePath) ?? string.Empty, constructedFilename);
+        private static string FormatPositionForFilename(Position? position)
+        {
+            if (position == null) return string.Empty;
+            if (position.X == 0 && position.Y == 0 && position.Z == 0) return string.Empty;
+
+            return position.Z == 0
+                ? $" ({position.X.ToString("0.0", CultureInfo.InvariantCulture)},{position.Y.ToString("0.0", CultureInfo.InvariantCulture)})"
+                : $" ({position.X.ToString("0.0", CultureInfo.InvariantCulture)},{position.Y.ToString("0.0", CultureInfo.InvariantCulture)},{position.Z.ToString("0.0", CultureInfo.InvariantCulture)})";
+        }
+
+        private static bool LooksAlreadyRenamed(string fileName)
+        {
+            if (fileName.Length < Constants.Formats.CompactTimestamp.Length) return false;
+            return DateTime.TryParseExact(
+                fileName.Substring(0, Constants.Formats.CompactTimestamp.Length),
+                Constants.Formats.CompactTimestamp,
+                null,
+                DateTimeStyles.None,
+                out _);
         }
 
         private static readonly HashSet<char> InvalidFileNameChars = new(Path.GetInvalidFileNameChars());
@@ -322,52 +332,12 @@ namespace Sightseeingway
         private static string StripInvalidFileNameChars(string name)
         {
             if (string.IsNullOrEmpty(name)) return name;
-            var buffer = new System.Text.StringBuilder(name.Length);
+            var buffer = new StringBuilder(name.Length);
             foreach (var c in name)
             {
                 if (!InvalidFileNameChars.Contains(c)) buffer.Append(c);
             }
             return buffer.Length == name.Length ? name : buffer.ToString();
-        }
-
-        private static readonly ConcurrentQueue<(string SourceNamePath, string FinalName)> RenameQueue = new();
-        private static readonly Timer RenameTimer = new(RenameQueuedFiles, null, Timeout.Infinite, Timeout.Infinite);
-
-        public static void QueueRenameOperation(string sourceNamePath, string finalName)
-        {
-            RenameQueue.Enqueue((sourceNamePath, finalName));
-            RenameTimer.Change(Constants.FileOperations.RenameQueueDelayMs, Timeout.Infinite);
-        }
-
-        private static void RenameQueuedFiles(object? state)
-        {
-            while (RenameQueue.TryDequeue(out var renameOperation))
-            {
-                var waitResult = WaitForFileReleaseGeneric(renameOperation.SourceNamePath, FileAccess.ReadWrite);
-                if (waitResult.IsSuccess)
-                {
-                    var moveResult = MoveFileWithRetry(renameOperation.SourceNamePath, renameOperation.FinalName);
-                    if (moveResult.IsSuccess)
-                    {
-                        Plugin.Logger?.Information($"File renamed from {renameOperation.SourceNamePath} to {renameOperation.FinalName}");
-
-                        if (Plugin.Config.ShowNameChangesInChat)
-                        {
-                            Plugin.Logger?.UserMessage($"Screenshot renamed: {Path.GetFileName(renameOperation.FinalName)}");
-                        }
-                    }
-                    else
-                    {
-                        Plugin.Logger?.Error(moveResult.ErrorMessage ?? 
-                            $"Unknown error renaming {Path.GetFileName(renameOperation.SourceNamePath)}", 
-                            moveResult.Exception, true);
-                    }
-                }
-                else
-                {
-                    Plugin.Logger?.Warning($"File not released in time for renaming: {renameOperation.SourceNamePath}");
-                }
-            }
         }
     }
 

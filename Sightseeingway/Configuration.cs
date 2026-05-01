@@ -1,5 +1,6 @@
 using Dalamud.Configuration;
 using Newtonsoft.Json;
+using Sightseeingway.Services;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,12 +10,15 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public int Version { get; set; } = 4;
+        public const int CurrentVersion = 5;
+
+        public int Version { get; set; } = CurrentVersion;
+
+        // --- Filename composition (unchanged from v1.2) ---
 
         private string _selectedFields = GetDefaultSelectedFields();
         private List<FilenameField>? _cachedFields;
 
-        // Persisted as a comma-separated string for back-compat (e.g. "Timestamp,CharacterName,...").
         public string SelectedFields
         {
             get => _selectedFields;
@@ -25,21 +29,81 @@ namespace Sightseeingway
             }
         }
 
-        // Typed accessor — parses once and caches until SelectedFields is reassigned.
         [JsonIgnore]
         public IReadOnlyList<FilenameField> Fields =>
             _cachedFields ??= FilenameGenerator.StringToFieldList(_selectedFields);
 
         public TimestampFormat TimestampFormat { get; set; } = TimestampFormat.Compact;
 
-        public bool DebugMode { get; set; } = false;
+        // --- v1.3 additions ---
 
+        public bool EmbedMetadata { get; set; } = false;
+
+        /// <summary>
+        /// Per-field opt-in for metadata embedding. Keys are
+        /// <see cref="MetadataField"/> enum names; missing keys default to off.
+        /// </summary>
+        public Dictionary<string, bool> MetadataFields { get; set; } = DefaultMetadataFields();
+
+        public LogVerbosity LogVerbosity { get; set; } = LogVerbosity.Status;
+
+        // --- Deprecated (kept for one version cycle for cross-version safety) ---
+
+        [Obsolete("Migrated into LogVerbosity (true → Status, false → Quiet) in v5.")]
         public bool ShowNameChangesInChat { get; set; } = true;
+
+        [Obsolete("Migrated into LogVerbosity (true → Debug) in v5.")]
+        public bool DebugMode { get; set; } = false;
 
         public static string GetDefaultSelectedFields() =>
             string.Join(",", Enum.GetValues(typeof(FilenameField)).Cast<FilenameField>().Select(f => f.ToString()));
 
+        public static Dictionary<string, bool> DefaultMetadataFields() => new()
+        {
+            // Scene group (defaults all on)
+            [nameof(MetadataField.Location)]    = true,
+            [nameof(MetadataField.Time)]        = true,
+            [nameof(MetadataField.Weather)]     = true,
+            [nameof(MetadataField.Flags)]       = true,
+            [nameof(MetadataField.Shader)]      = true,
+
+            // Character group (Personal-style defaults — visual on, identifying off)
+            [nameof(MetadataField.CharacterName)]   = true,   // grandfathered from filename default
+            [nameof(MetadataField.CharacterWorld)]  = false,
+            [nameof(MetadataField.CharacterRace)]   = true,
+            [nameof(MetadataField.CharacterJob)]   = true,
+            [nameof(MetadataField.CharacterTitle)]  = false,
+            [nameof(MetadataField.CharacterMount)]  = true,
+
+            // Affiliation group (defaults all off)
+            [nameof(MetadataField.FreeCompany)]   = false,
+            [nameof(MetadataField.GrandCompany)]  = false,
+        };
+
+        public bool IsMetadataFieldEnabled(MetadataField field) =>
+            MetadataFields.TryGetValue(field.ToString(), out var enabled) && enabled;
+
         public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
+
+        /// <summary>
+        /// Migrates a configuration loaded from disk to <see cref="CurrentVersion"/>.
+        /// Idempotent — re-running on an already-current config is a no-op.
+        /// </summary>
+        public void Migrate()
+        {
+#pragma warning disable CS0618 // referencing obsolete migration-only fields
+            if (Version < 5)
+            {
+                LogVerbosity = DebugMode
+                    ? LogVerbosity.Debug
+                    : (ShowNameChangesInChat ? LogVerbosity.Status : LogVerbosity.Quiet);
+
+                MetadataFields ??= DefaultMetadataFields();
+
+                Version = CurrentVersion;
+            }
+#pragma warning restore CS0618
+        }
     }
 
     public enum FilenameField
@@ -50,13 +114,40 @@ namespace Sightseeingway
         Position,
         EorzeaTime,
         Weather,
-        ShaderPreset
+        ShaderPreset,
     }
 
     public enum TimestampFormat
     {
         Compact,    // yyyyMMddHHmmssfff
         Regular,    // yyyyMMdd-HHmmss-fff
-        Readable    // yyyy-MM-dd_HH-mm-ss.fff
+        Readable,   // yyyy-MM-dd_HH-mm-ss.fff
+    }
+
+    /// <summary>
+    /// Field keys for metadata embedding. Each maps to a <see cref="StateSnapshot"/>
+    /// branch that can be independently included or omitted from the embedded
+    /// JSON payload based on user configuration.
+    /// </summary>
+    public enum MetadataField
+    {
+        // Scene group
+        Location,
+        Time,
+        Weather,
+        Flags,
+        Shader,
+
+        // Character group
+        CharacterName,
+        CharacterWorld,
+        CharacterRace,    // race / tribe / sex bundle
+        CharacterJob,     // job / level bundle
+        CharacterTitle,
+        CharacterMount,   // mount / minion bundle
+
+        // Affiliation group
+        FreeCompany,
+        GrandCompany,
     }
 }

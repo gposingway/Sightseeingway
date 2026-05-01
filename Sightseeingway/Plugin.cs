@@ -8,6 +8,7 @@ using System.Diagnostics;
 using Dalamud.Game.Config;
 using Dalamud.Interface.Windowing;
 using Dalamud.Game.Command;
+using Sightseeingway.Metadata;
 using Sightseeingway.Services;
 using Sightseeingway.Results;
 
@@ -15,13 +16,11 @@ namespace Sightseeingway
 {
     public sealed class Plugin : IDalamudPlugin
     {
-        // Static debug flag - will be initialized from config
-        public static bool DebugMode = false;
-
         [PluginService] internal static IDalamudPluginInterface PluginInterface { get; private set; } = null!;
         [PluginService] internal static ITextureProvider TextureProvider { get; private set; } = null!;
         [PluginService] internal static IFramework Framework { get; private set; } = null!;
         [PluginService] internal static IClientState ClientState { get; private set; } = null!;
+        [PluginService] internal static ICondition Condition { get; private set; } = null!;
         [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
         [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
@@ -31,6 +30,12 @@ namespace Sightseeingway
 
         // The unified logger service
         public static Logger? Logger { get; private set; } = null;
+
+        // Structured pipeline log (rolling file + ring buffer for the diagnostics panel).
+        public static PipelineLog? PipelineLog { get; private set; } = null;
+
+        // Background metadata pipeline (sidecar lifecycle + worker).
+        public static MetadataPipeline? MetadataPipeline { get; private set; } = null;
 
         private readonly List<FileSystemWatcher> screenshotWatchers = [];
         private readonly List<string> directoriesToMonitor = [];
@@ -51,20 +56,22 @@ namespace Sightseeingway
                 // IMPORTANT: Initialize all dependencies BEFORE creating the Logger
                 Log?.Debug("Plugin constructor started.");
                 
-                // Load configuration first
+                // Load configuration first, run any pending migrations.
                 Config = PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-                
-                // Set debug mode from configuration
-                DebugMode = Config.DebugMode;
-                
+                Config.Migrate();
+
                 // Setup UI system first, before creating any windows
                 windowSystem = new WindowSystem(Constants.Plugin.Name);
-                
-                // NOW initialize the Logger after basic services are ready
-                Logger = new Logger(Log, ChatGui, DebugMode);
-                
-                // After Logger is ready, we can use it safely
+
+                // Initialize logging.
+                Logger = new Logger(Log, ChatGui, Config.LogVerbosity);
+                PipelineLog = new PipelineLog(PluginInterface.GetPluginConfigDirectory());
+
                 Logger.Debug("Logger initialized, continuing with plugin setup.");
+
+                // Bring up the metadata pipeline (worker thread + recovery scan).
+                MetadataPipeline = new MetadataPipeline(PipelineLog, () => directoriesToMonitor.AsReadOnly());
+                IO.Pipeline = MetadataPipeline;
                 
                 // Now create the config window (which uses Logger)
                 configWindow = new ConfigWindow(Config);
@@ -93,6 +100,10 @@ namespace Sightseeingway
                 SetupShadingwayWatcher();
 
                 SetupConfigChangeWatcher();
+
+                // Start the worker only once watchers are wired so the recovery scan
+                // sees an accurate set of monitored directories.
+                MetadataPipeline.Start();
 
                 Logger.Debug("Plugin constructor finished.");
             }
@@ -136,29 +147,25 @@ namespace Sightseeingway
 
         private void OnCommand(string command, string args)
         {
-            // Handle args for debug mode if specified
             if (!string.IsNullOrWhiteSpace(args))
             {
                 var argsParts = args.Trim().Split(' ');
-                if (argsParts.Length > 0)
+                if (argsParts.Length > 0 && argsParts[0].Equals("debug", StringComparison.OrdinalIgnoreCase))
                 {
-                    switch (argsParts[0].ToLower())
+                    // Cycle: Quiet → Status → Debug → Quiet …
+                    Config.LogVerbosity = Config.LogVerbosity switch
                     {
-                        case "debug":
-                            // Toggle debug mode directly from command
-                            Config.DebugMode = !Config.DebugMode;
-                            DebugMode = Config.DebugMode;
-                            if (Logger != null)
-                            {
-                                Logger.SetDebugMode(DebugMode);
-                                Logger.UserMessage($"Debug mode {(DebugMode ? "enabled" : "disabled")}");
-                            }
-                            Config.Save();
-                            return;
-                    }
+                        LogVerbosity.Quiet => LogVerbosity.Status,
+                        LogVerbosity.Status => LogVerbosity.Debug,
+                        _ => LogVerbosity.Quiet,
+                    };
+                    Logger?.SetVerbosity(Config.LogVerbosity);
+                    Logger?.UserMessage($"Logging verbosity: {Config.LogVerbosity}");
+                    Config.Save();
+                    return;
                 }
             }
-            
+
             // Default behavior: toggle config window visibility
             configWindow!.IsOpen = !configWindow.IsOpen;
         }
@@ -405,6 +412,15 @@ namespace Sightseeingway
 
             DisposeScreenshotWatchers();
             DisposeShadingwayWatcher();
+
+            // Stop the worker; pending sidecars (if any) survive on disk for the next launch's recovery.
+            IO.Pipeline = null;
+            MetadataPipeline?.Dispose();
+            MetadataPipeline = null;
+
+            PipelineLog?.Dispose();
+            PipelineLog = null;
+
             Logger?.Debug("Dispose finished.");
             SafeUserMessage("Plugin Disposed.");
         }
