@@ -7,13 +7,13 @@ namespace Sightseeingway.UI.Components
     /// </summary>
     public class TimestampFormatSelector
     {
-        private readonly string[] _formatOptions = 
-        { 
-            "Compact (yyyyMMddHHmmssfff)", 
-            "Regular (yyyyMMdd-HHmmss-fff)", 
-            "Readable (yyyy-MM-dd_HH-mm-ss.fff)" 
+        private readonly string[] _formatOptions =
+        {
+            "Compact (yyyyMMddHHmmssfff)",
+            "Regular (yyyyMMdd-HHmmss-fff)",
+            "Readable (yyyy-MM-dd_HH-mm-ss.fff)"
         };
-        
+
         public bool Render(ref TimestampFormat currentFormat)
         {
             var changed = false;
@@ -27,6 +27,12 @@ namespace Sightseeingway.UI.Components
                 currentFormat = (TimestampFormat)formatIndex;
                 changed = true;
             }
+
+            // Tiny bottom pad so this column's separator lines up with the
+            // master-toggle separator on the metadata column. Use cursor math
+            // rather than Dummy() so we don't pick up ImGui's ItemSpacing
+            // surcharge on top of the requested pixels.
+            ImGui.SetCursorPosY(ImGui.GetCursorPosY() + 3);
 
             return changed;
         }
