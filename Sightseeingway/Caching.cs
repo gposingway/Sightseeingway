@@ -1,50 +1,51 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Linq;
 
 namespace Sightseeingway
 {
     public static class Caching
     {
-        private static readonly Dictionary<string, DateTime> RenamedFilesCache = [];
+        private static readonly ConcurrentDictionary<string, DateTime> RenamedFilesCache = new();
         private static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
 
         public static void AddToRenameCache(string filename)
         {
-            if (RenamedFilesCache.ContainsKey(filename))
-            {
-                RenamedFilesCache[filename] = DateTime.Now;
-                Plugin.Logger?.Debug($"Filename cache updated for '{filename}'.");
-            }
-            else
-            {
-                RenamedFilesCache.Add(filename, DateTime.Now);
-                Plugin.Logger?.Debug($"Filename '{filename}' added to rename cache.");
-            }
+            RenamedFilesCache[filename] = DateTime.UtcNow;
+            Plugin.Logger?.Debug($"Filename '{filename}' added/updated in rename cache.");
             CleanRenameCache();
         }
 
         public static bool IsInRenameCache(string filename)
         {
-            if (RenamedFilesCache.ContainsKey(filename))
+            if (!RenamedFilesCache.TryGetValue(filename, out var timestamp)) return false;
+
+            if (DateTime.UtcNow - timestamp > CacheDuration)
             {
-                Plugin.Logger?.Debug($"Filename '{filename}' found in rename cache.");
-                return true;
+                // Expired — drop it and treat as a miss.
+                RenamedFilesCache.TryRemove(filename, out _);
+                Plugin.Logger?.Debug($"Filename '{filename}' expired from rename cache on read.");
+                return false;
             }
-            return false;
+
+            Plugin.Logger?.Debug($"Filename '{filename}' found in rename cache.");
+            return true;
         }
 
         private static void CleanRenameCache()
         {
-            var expiredKeys = RenamedFilesCache.Keys.Where(key => DateTime.Now - RenamedFilesCache[key] > CacheDuration).ToList();
-            if (expiredKeys.Any())
+            var now = DateTime.UtcNow;
+            var expiredKeys = RenamedFilesCache
+                .Where(kvp => now - kvp.Value > CacheDuration)
+                .Select(kvp => kvp.Key)
+                .ToList();
+
+            if (expiredKeys.Count == 0) return;
+
+            Plugin.Logger?.Debug($"Cleaning {expiredKeys.Count} expired items from rename cache.");
+            foreach (var key in expiredKeys)
             {
-                Plugin.Logger?.Debug($"Cleaning {expiredKeys.Count} expired items from rename cache.");
-                foreach (var key in expiredKeys)
-                {
-                    RenamedFilesCache.Remove(key);
-                    Plugin.Logger?.Debug($"Expired filename '{key}' removed from cache.");
-                }
+                RenamedFilesCache.TryRemove(key, out _);
             }
         }
     }
