@@ -83,10 +83,13 @@ namespace Sightseeingway
             }
         }
 
+        // Polls until the OS releases the file's exclusive lock or we exhaust the retry budget.
+        // Runs on FileSystemWatcher / Timer threadpool threads where blocking via Thread.Sleep is acceptable;
+        // a true async API would require flipping every caller (watcher events are sync delegates).
         public static OperationResult WaitForFileReleaseGeneric(string filePath, FileAccess fileAccess = FileAccess.Read)
         {
             Plugin.Logger?.Debug($"WaitForFileReleaseGeneric started for: {filePath}, FileAccess: {fileAccess}");
-            
+
             for (var i = 0; i < Constants.FileOperations.MaxFileTries; ++i)
             {
                 try
@@ -219,14 +222,13 @@ namespace Sightseeingway
                 return null;
             }
 
-            var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
+            var config = Plugin.Config;
 
-            var activeFieldsInOrder = FilenameGenerator.StringToFieldList(config.SelectedFields);
-            activeFieldsInOrder = FilenameGenerator.EnsureTimestampIsFirst(activeFieldsInOrder);
+            var activeFieldsInOrder = FilenameGenerator.EnsureTimestampIsFirst(config.Fields);
 
             var fileCreationTime = File.GetCreationTime(filePath);
             
-            var character = Plugin.ClientState.LocalPlayer?.Name.TextValue ?? "";
+            var character = Plugin.ObjectTable.LocalPlayer?.Name.TextValue ?? "";
             var map = "";
             var position = "";
             var eorzeaTime = "";
@@ -259,7 +261,7 @@ namespace Sightseeingway
 
                         try
                         {
-                            var playerPos = Plugin.ClientState.LocalPlayer?.Position ?? Vector3.Zero;
+                            var playerPos = Plugin.ObjectTable.LocalPlayer?.Position ?? Vector3.Zero;
                             var mapVector = MapUtil.WorldToMap(playerPos, mapType.OffsetX, mapType.OffsetY, 0, mapType.SizeFactor);
                             var mapPlace = new Vector3(
                                 (int)MathF.Round(mapVector.X * 10, 1) / 10f,
@@ -310,12 +312,22 @@ namespace Sightseeingway
                 fileExtension
             );
 
-            foreach (var c in Path.GetInvalidFileNameChars())
-            {
-                constructedFilename = constructedFilename.Replace(c.ToString(), "");
-            }
+            constructedFilename = StripInvalidFileNameChars(constructedFilename);
 
             return Path.Combine(Path.GetDirectoryName(filePath) ?? string.Empty, constructedFilename);
+        }
+
+        private static readonly HashSet<char> InvalidFileNameChars = new(Path.GetInvalidFileNameChars());
+
+        private static string StripInvalidFileNameChars(string name)
+        {
+            if (string.IsNullOrEmpty(name)) return name;
+            var buffer = new System.Text.StringBuilder(name.Length);
+            foreach (var c in name)
+            {
+                if (!InvalidFileNameChars.Contains(c)) buffer.Append(c);
+            }
+            return buffer.Length == name.Length ? name : buffer.ToString();
         }
 
         private static readonly ConcurrentQueue<(string SourceNamePath, string FinalName)> RenameQueue = new();
@@ -337,14 +349,11 @@ namespace Sightseeingway
                     var moveResult = MoveFileWithRetry(renameOperation.SourceNamePath, renameOperation.FinalName);
                     if (moveResult.IsSuccess)
                     {
-                        // Get the config and check if we should show chat notifications
-                        var config = Plugin.PluginInterface.GetPluginConfig() as Configuration ?? new Configuration();
-                        
                         Plugin.Logger?.Information($"File renamed from {renameOperation.SourceNamePath} to {renameOperation.FinalName}");
-                        
-                        if (config.ShowNameChangesInChat)
+
+                        if (Plugin.Config.ShowNameChangesInChat)
                         {
-                            Client.PrintMessage($"Screenshot renamed: {Path.GetFileName(renameOperation.FinalName)}");
+                            Plugin.Logger?.UserMessage($"Screenshot renamed: {Path.GetFileName(renameOperation.FinalName)}");
                         }
                     }
                     else

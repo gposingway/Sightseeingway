@@ -1,9 +1,7 @@
-// filepath: f:\Replica\NAS\Files\repo\github\Sightseeingway\Sightseeingway\UI\Components\FieldOrderingComponent.cs
 using Dalamud.Bindings.ImGui;
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
 
 namespace Sightseeingway.UI.Components
 {
@@ -72,7 +70,7 @@ namespace Sightseeingway.UI.Components
         {
             bool changed = false;
             
-            ImGui.TextColored(new Vector4(1.0f, 0.85f, 0.0f, 1.0f), "Field Selection and Order");
+            ImGui.TextColored(Constants.UI.FieldHeaderColor, "Field Selection and Order");
             ImGui.TextWrapped("Select which fields to include and the order they'll be used.");
             ImGui.Spacing();
 

@@ -1,4 +1,3 @@
-// filepath: f:\Replica\NAS\Files\repo\github\Sightseeingway\Sightseeingway\UI\Components\FilenamePreviewComponent.cs
 using Dalamud.Bindings.ImGui;
 using System;
 using System.Collections.Generic;
@@ -13,15 +12,10 @@ namespace Sightseeingway.UI.Components
     {
         private string _previewFilename = "Loading example...";
         private DateTime _lastRefreshTime = DateTime.MinValue;
-        private readonly DateTime _exampleTimestamp;
-        
-        public FilenamePreviewComponent()
-        {
-            _exampleTimestamp = DateTime.Now;
-        }
-        
+
         /// <summary>
-        /// Refreshes the filename preview using the provided parameters
+        /// Refreshes the filename preview using the provided parameters. The example
+        /// timestamp is taken at refresh time, so the preview reflects "now".
         /// </summary>
         public void RefreshPreview(
             TimestampFormat timestampFormat,
@@ -34,10 +28,9 @@ namespace Sightseeingway.UI.Components
             string shaderPreset = "")
         {
             _lastRefreshTime = DateTime.Now;
-            
-            // Use the central filename generator to create a preview
+
             _previewFilename = FilenameGenerator.GenerateFilename(
-                _exampleTimestamp,
+                _lastRefreshTime,
                 timestampFormat,
                 characterName,
                 map,

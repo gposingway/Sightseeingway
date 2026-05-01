@@ -24,6 +24,7 @@ namespace Sightseeingway
         [PluginService] internal static IClientState ClientState { get; private set; } = null!;
         [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
+        [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
         [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
@@ -31,11 +32,12 @@ namespace Sightseeingway
         // The unified logger service
         public static Logger? Logger { get; private set; } = null;
 
-        private readonly List<FileSystemWatcher> fileWatchers = [];
+        private readonly List<FileSystemWatcher> screenshotWatchers = [];
         private readonly List<string> directoriesToMonitor = [];
+        private FileSystemWatcher? shadingwayWatcher;
 
         // Configuration and UI
-        public Configuration Config { get; private set; } = null!;
+        public static Configuration Config { get; private set; } = null!;
         private WindowSystem windowSystem = null!;
         private ConfigWindow? configWindow = null;
 
@@ -87,7 +89,7 @@ namespace Sightseeingway
                 SafeUserMessage("Ready to help, friend!");
 
                 InitializeDirectoriesToMonitor();
-                IO.SetupWatchers(directoriesToMonitor, fileWatchers);
+                IO.SetupWatchers(directoriesToMonitor, screenshotWatchers);
                 SetupShadingwayWatcher();
 
                 SetupConfigChangeWatcher();
@@ -181,20 +183,39 @@ namespace Sightseeingway
                 {
                     Logger?.Debug("Screenshot directory setting changed, reinitializing directories to monitor.");
                     InitializeDirectoriesToMonitor();
-                    IO.SetupWatchers(directoriesToMonitor, fileWatchers);
+                    IO.SetupWatchers(directoriesToMonitor, screenshotWatchers);
                 }
             };
+        }
+
+        private void DisposeScreenshotWatchers()
+        {
+            foreach (var watcher in screenshotWatchers)
+            {
+                watcher.Created -= IO.OnFileCreated;
+                watcher.Dispose();
+            }
+            screenshotWatchers.Clear();
+        }
+
+        private void DisposeShadingwayWatcher()
+        {
+            if (shadingwayWatcher == null) return;
+            shadingwayWatcher.Changed -= OnShadingwayStateFileChanged;
+            shadingwayWatcher.Created -= OnShadingwayStateFileChanged;
+            shadingwayWatcher.Renamed -= OnShadingwayStateFileChanged;
+            shadingwayWatcher.Dispose();
+            shadingwayWatcher = null;
         }
 
         private void InitializeDirectoriesToMonitor()
         {
             Logger?.Debug("InitializeDirectoriesToMonitor started.");
 
-            foreach (var watcher in fileWatchers) watcher.Dispose();
-            fileWatchers.Clear();
+            DisposeScreenshotWatchers();
             directoriesToMonitor.Clear();
 
-            var defaultScreenshotFolder = Environment.GetDefaultScreenshotFolder();
+            var defaultScreenshotFolder = GameEnvironment.GetDefaultScreenshotFolder();
 
             if (defaultScreenshotFolder != null)
             {
@@ -202,7 +223,7 @@ namespace Sightseeingway
                 Logger?.Debug($"Default screenshot folder added to monitor list: {defaultScreenshotFolder}");
             }
 
-            var gameBaseDir = Environment.GetGameDirectory();
+            var gameBaseDir = GameEnvironment.GetGameDirectory();
             var dxgiPath = Path.Combine(gameBaseDir, Constants.FileOperations.DxgiFileName);
 
             if (File.Exists(dxgiPath))
@@ -292,7 +313,7 @@ namespace Sightseeingway
 
         private void SetupShadingwayWatcher()
         {
-            var gameBaseDir = Environment.GetGameDirectory();
+            var gameBaseDir = GameEnvironment.GetGameDirectory();
             var shadingwayStateFilePath = Path.Combine(gameBaseDir, Constants.FileOperations.ShadingwayStateFileName);
 
             if (File.Exists(shadingwayStateFilePath))
@@ -323,16 +344,16 @@ namespace Sightseeingway
                     Logger?.Warning("Could not load initial Shadingway state due to file access issues.");
                 }
 
-                var watcher = new FileSystemWatcher(gameBaseDir)
+                DisposeShadingwayWatcher();
+                shadingwayWatcher = new FileSystemWatcher(gameBaseDir)
                 {
                     Filter = Constants.FileOperations.ShadingwayStateFileName,
                     EnableRaisingEvents = true,
                     NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.DirectoryName
                 };
-                watcher.Changed += OnShadingwayStateFileChanged;
-                watcher.Created += OnShadingwayStateFileChanged;
-                watcher.Renamed += OnShadingwayStateFileChanged;
-                fileWatchers.Add(watcher);
+                shadingwayWatcher.Changed += OnShadingwayStateFileChanged;
+                shadingwayWatcher.Created += OnShadingwayStateFileChanged;
+                shadingwayWatcher.Renamed += OnShadingwayStateFileChanged;
                 Logger?.Information($"Monitoring {Constants.FileOperations.ShadingwayStateFileName} in: {gameBaseDir}");
             }
             else
@@ -382,27 +403,10 @@ namespace Sightseeingway
             PluginInterface.UiBuilder.Draw -= DrawUI;
             PluginInterface.UiBuilder.OpenConfigUi -= DrawConfigUI;
 
-            foreach (var watcher in fileWatchers)
-            {
-                Logger?.Debug($"Disposing watcher for folder: {watcher.Path}");
-                watcher.Created -= IO.OnFileCreated;
-                watcher.Changed -= OnShadingwayStateFileChanged;
-                watcher.Dispose();
-                Logger?.Debug($"Watcher for folder disposed: {watcher.Path}");
-            }
-            fileWatchers.Clear();
-            Logger?.Debug("Watcher list cleared.");
+            DisposeScreenshotWatchers();
+            DisposeShadingwayWatcher();
             Logger?.Debug("Dispose finished.");
             SafeUserMessage("Plugin Disposed.");
-        }
-
-        // Update the static SendMessage method to use our Logger instead
-        public static void SendMessage(string message)
-        {
-            if (DebugMode && Logger != null)
-            {
-                Logger.UserMessage(message);
-            }
         }
     }
 }

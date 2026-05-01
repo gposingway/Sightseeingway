@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project Sdk="Dalamud.NET.Sdk/13.0.0">
+<Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>1.1.0.3</Version>
+    <Version>1.2.0.0</Version>
     <Description>Automatically rename your screenshots with character, location and weather info.</Description>
     <PackageProjectUrl>https://github.com/gposingway/Sightseeingway</PackageProjectUrl>
     <PackageLicenseExpression>AGPL-3.0-or-later</PackageLicenseExpression>
     <IsPackable>false</IsPackable>
-    <TargetFramework>net9.0-windows</TargetFramework>
-    <Platform>string</Platform>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Platforms>x64</Platforms>
   </PropertyGroup>
 
   <ItemGroup>
