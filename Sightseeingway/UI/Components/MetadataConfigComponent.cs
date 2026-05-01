@@ -5,30 +5,23 @@ namespace Sightseeingway.UI.Components
 {
     /// <summary>
     /// The Metadata column of the v1.3 config window. Master embed toggle on
-    /// top, then three collapsible field groups (Scene / Character /
-    /// Affiliation) each with a tri-state parent checkbox and a list of
-    /// per-field child checkboxes.
+    /// top, then three field groups (Scene / Character / Affiliation), each
+    /// with a tri-state parent checkbox and a flat list of per-field child
+    /// checkboxes.
     /// </summary>
     public class MetadataConfigComponent
     {
-        private readonly Dictionary<string, bool> _groupExpanded = new()
-        {
-            ["Scene"] = true,
-            ["Character"] = true,
-            ["Affiliation"] = false,
-        };
-
         private static readonly (string Group, MetadataField Field, string Label, string? Tooltip)[] Groups =
         {
-            // Scene
-            ("Scene", MetadataField.Location, "Location", "Territory, map, and map-space coordinates."),
-            ("Scene", MetadataField.Time,     "Time",     "Eorzean time of day (period and hour)."),
-            ("Scene", MetadataField.Weather,  "Weather",  "Current in-game weather."),
-            ("Scene", MetadataField.Flags,    "Flags",    "Mode and state flags: gpose, mounted, swimming, etc."),
-            ("Scene", MetadataField.Shader,   "Shader",   "Active Shadingway preset, when Shadingway is detected."),
+            // Scene — labels mirror the filename column where there's a 1:1 concept.
+            ("Scene", MetadataField.Location, "Map/Zone + Coordinates", "Territory, map name, and map-space coordinates."),
+            ("Scene", MetadataField.Time,     "Eorzea Time",            "Eorzean time of day (period and hour)."),
+            ("Scene", MetadataField.Weather,  "Weather",                "Current in-game weather."),
+            ("Scene", MetadataField.Flags,    "Flags",                  "Mode and state flags: gpose, mounted, swimming, etc."),
+            ("Scene", MetadataField.Shader,   "Shader Preset",          "Active Shadingway preset, when Shadingway is detected."),
 
             // Character
-            ("Character", MetadataField.CharacterName,  "Name",                "Character name."),
+            ("Character", MetadataField.CharacterName,  "Character Name",      "Character name."),
             ("Character", MetadataField.CharacterWorld, "World",               "Current and home server."),
             ("Character", MetadataField.CharacterRace,  "Race / Tribe / Sex",  "Visual character identity."),
             ("Character", MetadataField.CharacterJob,   "Job / Level",         "Active class/job and level."),
@@ -48,7 +41,6 @@ namespace Sightseeingway.UI.Components
         {
             var changed = false;
 
-            // Master toggle.
             ImGui.TextColored(Constants.UI.HeaderColor, "Metadata");
             ImGui.Spacing();
 
@@ -83,23 +75,17 @@ namespace Sightseeingway.UI.Components
             return changed;
         }
 
-        private bool RenderGroup(Configuration tempConfig, string groupName)
+        private static bool RenderGroup(Configuration tempConfig, string groupName)
         {
             var changed = false;
 
-            // Compute parent state.
+            // Compute parent state from children.
             var (on, total) = CountChildren(tempConfig, groupName);
             var parentState = on == 0 ? CheckState.Unchecked
                             : on == total ? CheckState.Checked
                             : CheckState.Indeterminate;
 
-            // Header row: chevron, tri-state checkbox, label.
-            var expanded = _groupExpanded[groupName];
-            if (ImGui.SmallButton(expanded ? $"v##{groupName}" : $">##{groupName}"))
-                _groupExpanded[groupName] = !expanded;
-
-            ImGui.SameLine();
-
+            // Header row: tri-state checkbox + group label + child count.
             if (TriStateCheckbox.Draw($"##group_{groupName}", parentState))
             {
                 var setTo = parentState == CheckState.Unchecked;
@@ -116,33 +102,30 @@ namespace Sightseeingway.UI.Components
             ImGui.SameLine();
             ImGui.TextColored(Constants.UI.InfoColor, $"({on}/{total})");
 
-            // Children.
-            if (_groupExpanded[groupName])
+            // Children always visible, indented.
+            ImGui.Indent();
+            foreach (var (group, field, label, tooltip) in Groups)
             {
-                ImGui.Indent();
-                foreach (var (group, field, label, tooltip) in Groups)
+                if (group != groupName) continue;
+
+                var key = field.ToString();
+                var enabled = tempConfig.MetadataFields.GetValueOrDefault(key, false);
+                if (ImGui.Checkbox($"{label}##{key}", ref enabled))
                 {
-                    if (group != groupName) continue;
-
-                    var key = field.ToString();
-                    var on_ = tempConfig.MetadataFields.GetValueOrDefault(key, false);
-                    if (ImGui.Checkbox($"{label}##{key}", ref on_))
-                    {
-                        tempConfig.MetadataFields[key] = on_;
-                        changed = true;
-                    }
-
-                    if (tooltip != null && ImGui.IsItemHovered())
-                    {
-                        ImGui.BeginTooltip();
-                        ImGui.Text(tooltip);
-                        ImGui.EndTooltip();
-                    }
+                    tempConfig.MetadataFields[key] = enabled;
+                    changed = true;
                 }
-                ImGui.Unindent();
-            }
 
+                if (tooltip != null && ImGui.IsItemHovered())
+                {
+                    ImGui.BeginTooltip();
+                    ImGui.Text(tooltip);
+                    ImGui.EndTooltip();
+                }
+            }
+            ImGui.Unindent();
             ImGui.Spacing();
+
             return changed;
         }
 

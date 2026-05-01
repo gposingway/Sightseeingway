@@ -77,25 +77,24 @@ namespace Sightseeingway
 
         public override void Draw()
         {
-            // Reserve room at the bottom for the diagnostics + button rows.
-            const float reservedHeight = 280f;
-            var availableY = Math.Max(120f, ImGui.GetContentRegionAvail().Y - reservedHeight);
+            // Pin the action button row to the bottom of the window. Everything
+            // above it lives in a single scrollable region, so expanding the
+            // metadata preview or recent events panel never pushes the buttons
+            // out of view.
+            var buttonRowReserved = Constants.UI.ButtonHeight + 16f;
+            var contentHeight = Math.Max(120f, ImGui.GetContentRegionAvail().Y - buttonRowReserved);
+
+            ImGui.BeginChild("##ContentRegion", new Vector2(-1, contentHeight), false);
 
             if (ImGui.BeginTable("##MainTwoColumn", 2, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame))
             {
                 ImGui.TableNextRow();
 
-                // Left column — Filename
                 ImGui.TableNextColumn();
-                ImGui.BeginChild("##FilenameColumn", new Vector2(0, availableY), false);
                 if (DrawFilenameColumn()) configChanged = true;
-                ImGui.EndChild();
 
-                // Right column — Metadata
                 ImGui.TableNextColumn();
-                ImGui.BeginChild("##MetadataColumn", new Vector2(0, availableY), false);
                 if (metadataConfig.Render(tempConfig)) configChanged = true;
-                ImGui.EndChild();
 
                 ImGui.EndTable();
             }
@@ -113,10 +112,9 @@ namespace Sightseeingway
 
             if (diagnostics.Render(tempConfig)) configChanged = true;
 
-            ImGui.Spacing();
-            ImGui.Separator();
-            ImGui.Spacing();
+            ImGui.EndChild();
 
+            ImGui.Separator();
             DrawButtonRow();
 
             // Refresh previews if anything changed during this draw.
