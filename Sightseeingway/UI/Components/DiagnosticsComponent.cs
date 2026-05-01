@@ -29,7 +29,10 @@ namespace Sightseeingway.UI.Components
             ImGui.TextColored(Constants.UI.SectionAccentColor, "Diagnostics");
             ImGui.Spacing();
 
-            ImGui.Text("Logging verbosity:");
+            // Two labelled fields side by side, mirroring the way the metadata
+            // groups present "label + control" rows.
+            // Row: Verbosity:  [Quiet] [Status] [Debug]   Pipeline: Idle (0 pending)
+            ImGui.Text("Verbosity:");
             ImGui.SameLine();
             var verbosity = tempConfig.LogVerbosity;
             if (VerbositySegmentedControl.Draw(ref verbosity))
@@ -38,27 +41,36 @@ namespace Sightseeingway.UI.Components
                 changed = true;
             }
 
-            ImGui.Spacing();
-
-            // Live pipeline status.
             var pipeline = Plugin.MetadataPipeline;
             var pending = pipeline?.PendingCount ?? 0;
             var status = pipeline?.Status ?? "Idle";
-            ImGui.Text($"Pipeline: {status} ({pending} pending)");
+            var pipelineText = $"Pipeline: {status} ({pending} pending)";
+            var pipelineWidth = ImGui.CalcTextSize(pipelineText).X;
+            var rightEdge = ImGui.GetContentRegionAvail().X;
+            ImGui.SameLine(0, 24f);
+            // Right-align the pipeline status to the column's trailing edge if there's room.
+            var spaceForRightAlign = rightEdge - ImGui.GetCursorPosX() + ImGui.GetWindowContentRegionMin().X;
+            if (spaceForRightAlign > pipelineWidth + 8f)
+                ImGui.SameLine(ImGui.GetWindowContentRegionMax().X - pipelineWidth);
+            ImGui.TextColored(Constants.UI.InfoColor, pipelineText);
 
-            // Recent events panel.
             ImGui.Spacing();
-            if (ImGui.SmallButton(_eventsExpanded ? "v Recent events" : "> Recent events"))
+
+            // Action buttons all on one line, with the recent-events toggle leading.
+            if (ImGui.Button(_eventsExpanded ? "Hide Recent Events" : "Show Recent Events"))
                 _eventsExpanded = !_eventsExpanded;
-
-            if (_eventsExpanded) RenderRecentEvents();
-
-            ImGui.Spacing();
-
-            // Action buttons.
+            ImGui.SameLine();
             if (ImGui.Button("Open Log Folder")) OpenLogFolder();
             ImGui.SameLine();
             if (ImGui.Button("Copy Diagnostic Snapshot")) CopyDiagnosticSnapshot();
+
+            // Recent events panel — already a bordered child window when shown,
+            // so it provides its own visual frame below the actions.
+            if (_eventsExpanded)
+            {
+                ImGui.Spacing();
+                RenderRecentEvents();
+            }
 
             return changed;
         }
