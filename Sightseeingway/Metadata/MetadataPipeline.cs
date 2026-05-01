@@ -1,6 +1,8 @@
+using Sightseeingway.Metadata.Writers;
 using Sightseeingway.Services;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 
@@ -13,10 +15,9 @@ namespace Sightseeingway.Metadata
     /// recovery scan logic. Sidecars on disk are the durable queue; this class
     /// is the runtime view of "what to do with them next."
     ///
-    /// Track A scope: lifecycle management + worker loop + recovery scan.
-    /// The injection step is a stub that immediately marks tasks as injected
-    /// and deletes their sidecars; Track B replaces the stub with real
-    /// PNG/JPEG metadata writers.
+    /// Resolves a format-specific <see cref="IMetadataWriter"/> per task and
+    /// invokes it once the file is released; the writer itself is pure and
+    /// performs the atomic on-disk replacement.
     /// </summary>
     public sealed class MetadataPipeline : IDisposable
     {
@@ -204,16 +205,25 @@ namespace Sightseeingway.Metadata
                     SidecarRepository.Write(sidecarPath, task);
                 }
 
-                // Step 2: inject. Track A stub — Track B implements real writers.
+                // Step 2: inject. Only proceed if the user has opted in via config.
                 if (!task.Injected)
                 {
-                    var injectResult = InjectMetadataStub(task);
-                    if (!injectResult)
+                    if (!ShouldInject())
                     {
-                        _log.Warn("injection.skipped", task.CorrelationId, $"path={task.TargetPath}");
-                        return ProcessOutcome.Skipped;
+                        // Embedding is off; treat as injected so the sidecar gets cleaned up.
+                        _log.Debug("injection.skipped.disabled", task.CorrelationId);
+                        task = task.With(injected: true);
                     }
-                    task = task.With(injected: true);
+                    else
+                    {
+                        var injected = InjectMetadata(task);
+                        if (!injected)
+                        {
+                            // Leave the sidecar so the next pass (or next launch) can retry.
+                            return ProcessOutcome.Skipped;
+                        }
+                        task = task.With(injected: true);
+                    }
                 }
 
                 // Step 3: cleanup.
@@ -227,13 +237,51 @@ namespace Sightseeingway.Metadata
             }
         }
 
-        /// <summary>
-        /// Track A stub — pretends injection succeeded without modifying the file.
-        /// Track B replaces this with a real <see cref="Writers.IMetadataWriter"/> dispatch.
-        /// </summary>
-        private bool InjectMetadataStub(SidecarTask task)
+        private static bool ShouldInject() => Plugin.Config?.EmbedMetadata ?? false;
+
+        private bool InjectMetadata(SidecarTask task)
         {
-            _log.Info("injection.stub", task.CorrelationId, $"path={Path.GetFileName(task.TargetPath)}");
+            var writer = MetadataWriterRegistry.GetFor(task.TargetPath);
+            if (writer == null)
+            {
+                _log.Warn("injection.unsupported_format", task.CorrelationId,
+                    $"path={Path.GetFileName(task.TargetPath)}");
+                // Treat unsupported formats as a successful no-op so the sidecar is cleaned up.
+                return true;
+            }
+
+            // Wait for any external lock to release before opening for read+write.
+            var waitResult = IO.WaitForFileReleaseGeneric(task.TargetPath, FileAccess.ReadWrite);
+            if (!waitResult.IsSuccess)
+            {
+                _log.Warn("wait.release.timeout", task.CorrelationId,
+                    $"path={Path.GetFileName(task.TargetPath)} stage=injection");
+                return false;
+            }
+
+            _log.Info("injection.start", task.CorrelationId, $"writer={writer.Name}");
+            var sw = Stopwatch.StartNew();
+            long bytesIn = 0;
+            try { bytesIn = new FileInfo(task.TargetPath).Length; } catch { }
+
+            var snapshotForFile = task.Snapshot.FilteredFor(Plugin.Config);
+            var result = writer.Write(task.TargetPath, snapshotForFile, _cts.Token);
+            sw.Stop();
+
+            if (!result.IsSuccess)
+            {
+                _log.Error("injection.failed", task.CorrelationId,
+                    $"writer={writer.Name} error={result.ErrorMessage}");
+                return false;
+            }
+
+            long bytesOut = 0;
+            try { bytesOut = new FileInfo(task.TargetPath).Length; } catch { }
+
+            _log.Info("injection.complete", task.CorrelationId,
+                $"writer={writer.Name} duration_ms={sw.ElapsedMilliseconds} " +
+                $"bytes_in={bytesIn} bytes_out={bytesOut}");
+
             return true;
         }
 

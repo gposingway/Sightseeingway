@@ -43,6 +43,58 @@ namespace Sightseeingway.Metadata
 
         [JsonProperty("flags", NullValueHandling = NullValueHandling.Ignore, Order = 9)]
         public IReadOnlyList<string>? Flags { get; init; }
+
+        /// <summary>
+        /// Returns a copy with branches dropped according to the user's per-field
+        /// metadata opt-in configuration. The full snapshot is preserved on disk
+        /// in the sidecar; this filter only shapes what gets embedded into the
+        /// final image.
+        /// </summary>
+        public StateSnapshot FilteredFor(Configuration config)
+        {
+            if (config == null) return this;
+
+            CharacterInfo? filteredCharacter = null;
+            if (Character != null)
+            {
+                var anyCharacterField =
+                    config.IsMetadataFieldEnabled(MetadataField.CharacterName)
+                    || config.IsMetadataFieldEnabled(MetadataField.CharacterWorld)
+                    || config.IsMetadataFieldEnabled(MetadataField.CharacterRace)
+                    || config.IsMetadataFieldEnabled(MetadataField.CharacterJob)
+                    || config.IsMetadataFieldEnabled(MetadataField.CharacterTitle)
+                    || config.IsMetadataFieldEnabled(MetadataField.CharacterMount)
+                    || config.IsMetadataFieldEnabled(MetadataField.GrandCompany);
+
+                if (anyCharacterField)
+                {
+                    filteredCharacter = new CharacterInfo
+                    {
+                        Name = config.IsMetadataFieldEnabled(MetadataField.CharacterName) ? Character.Name : null,
+                        World = config.IsMetadataFieldEnabled(MetadataField.CharacterWorld) ? Character.World : null,
+                        Race = config.IsMetadataFieldEnabled(MetadataField.CharacterRace) ? Character.Race : null,
+                        Tribe = config.IsMetadataFieldEnabled(MetadataField.CharacterRace) ? Character.Tribe : null,
+                        Sex = config.IsMetadataFieldEnabled(MetadataField.CharacterRace) ? Character.Sex : null,
+                        Job = config.IsMetadataFieldEnabled(MetadataField.CharacterJob) ? Character.Job : null,
+                        Title = config.IsMetadataFieldEnabled(MetadataField.CharacterTitle) ? Character.Title : null,
+                        GrandCompany = config.IsMetadataFieldEnabled(MetadataField.GrandCompany) ? Character.GrandCompany : null,
+                        Mount = config.IsMetadataFieldEnabled(MetadataField.CharacterMount) ? Character.Mount : null,
+                        Minion = config.IsMetadataFieldEnabled(MetadataField.CharacterMount) ? Character.Minion : null,
+                    };
+                }
+            }
+
+            return this with
+            {
+                Character = filteredCharacter,
+                FreeCompany = config.IsMetadataFieldEnabled(MetadataField.FreeCompany) ? FreeCompany : null,
+                Location = config.IsMetadataFieldEnabled(MetadataField.Location) ? Location : null,
+                Time = config.IsMetadataFieldEnabled(MetadataField.Time) ? Time : null,
+                Weather = config.IsMetadataFieldEnabled(MetadataField.Weather) ? Weather : null,
+                Shader = config.IsMetadataFieldEnabled(MetadataField.Shader) ? Shader : null,
+                Flags = config.IsMetadataFieldEnabled(MetadataField.Flags) ? Flags : null,
+            };
+        }
     }
 
     public sealed record NamedId(
