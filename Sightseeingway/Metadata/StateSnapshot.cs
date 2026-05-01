@@ -57,29 +57,25 @@ namespace Sightseeingway.Metadata
             CharacterInfo? filteredCharacter = null;
             if (Character != null)
             {
-                var anyCharacterField =
-                    config.IsMetadataFieldEnabled(MetadataField.CharacterName)
-                    || config.IsMetadataFieldEnabled(MetadataField.CharacterWorld)
-                    || config.IsMetadataFieldEnabled(MetadataField.CharacterRace)
-                    || config.IsMetadataFieldEnabled(MetadataField.CharacterJob)
-                    || config.IsMetadataFieldEnabled(MetadataField.CharacterTitle)
-                    || config.IsMetadataFieldEnabled(MetadataField.CharacterMount)
-                    || config.IsMetadataFieldEnabled(MetadataField.GrandCompany);
+                var characterData = config.IsMetadataFieldEnabled(MetadataField.CharacterData);
+                var characterWorld = config.IsMetadataFieldEnabled(MetadataField.CharacterWorld);
+                var characterMount = config.IsMetadataFieldEnabled(MetadataField.CharacterMount);
+                var grandCompany = config.IsMetadataFieldEnabled(MetadataField.GrandCompany);
 
-                if (anyCharacterField)
+                if (characterData || characterWorld || characterMount || grandCompany)
                 {
                     filteredCharacter = new CharacterInfo
                     {
-                        Name = config.IsMetadataFieldEnabled(MetadataField.CharacterName) ? Character.Name : null,
-                        World = config.IsMetadataFieldEnabled(MetadataField.CharacterWorld) ? Character.World : null,
-                        Race = config.IsMetadataFieldEnabled(MetadataField.CharacterRace) ? Character.Race : null,
-                        Tribe = config.IsMetadataFieldEnabled(MetadataField.CharacterRace) ? Character.Tribe : null,
-                        Sex = config.IsMetadataFieldEnabled(MetadataField.CharacterRace) ? Character.Sex : null,
-                        Job = config.IsMetadataFieldEnabled(MetadataField.CharacterJob) ? Character.Job : null,
-                        Title = config.IsMetadataFieldEnabled(MetadataField.CharacterTitle) ? Character.Title : null,
-                        GrandCompany = config.IsMetadataFieldEnabled(MetadataField.GrandCompany) ? Character.GrandCompany : null,
-                        Mount = config.IsMetadataFieldEnabled(MetadataField.CharacterMount) ? Character.Mount : null,
-                        Minion = config.IsMetadataFieldEnabled(MetadataField.CharacterMount) ? Character.Minion : null,
+                        Name  = characterData ? Character.Name  : null,
+                        Race  = characterData ? Character.Race  : null,
+                        Tribe = characterData ? Character.Tribe : null,
+                        Sex   = characterData ? Character.Sex   : null,
+                        Job   = characterData ? Character.Job   : null,
+                        Title = characterData ? Character.Title : null,
+                        World = characterWorld ? Character.World : null,
+                        Mount  = characterMount ? Character.Mount  : null,
+                        Minion = characterMount ? Character.Minion : null,
+                        GrandCompany = grandCompany ? Character.GrandCompany : null,
                     };
                 }
             }

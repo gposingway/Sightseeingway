@@ -67,12 +67,9 @@ namespace Sightseeingway
             [nameof(MetadataField.Flags)]       = true,
             [nameof(MetadataField.Shader)]      = true,
 
-            // Character group (Personal-style defaults — visual on, identifying off)
-            [nameof(MetadataField.CharacterName)]   = true,   // grandfathered from filename default
+            // Character group
+            [nameof(MetadataField.CharacterData)]   = true,   // bundled: name, race/tribe/sex, job, title
             [nameof(MetadataField.CharacterWorld)]  = false,
-            [nameof(MetadataField.CharacterRace)]   = true,
-            [nameof(MetadataField.CharacterJob)]   = true,
-            [nameof(MetadataField.CharacterTitle)]  = false,
             [nameof(MetadataField.CharacterMount)]  = true,
 
             // Affiliation group (defaults all off)
@@ -125,9 +122,10 @@ namespace Sightseeingway
     }
 
     /// <summary>
-    /// Field keys for metadata embedding. Each maps to a <see cref="StateSnapshot"/>
-    /// branch that can be independently included or omitted from the embedded
-    /// JSON payload based on user configuration.
+    /// Field keys for metadata embedding. Each maps to one or more
+    /// <see cref="StateSnapshot"/> branches that can be independently
+    /// included or omitted from the embedded JSON payload based on user
+    /// configuration.
     /// </summary>
     public enum MetadataField
     {
@@ -139,12 +137,9 @@ namespace Sightseeingway
         Shader,
 
         // Character group
-        CharacterName,
+        CharacterData,    // bundle: name, race/tribe/sex, job/level, title
         CharacterWorld,
-        CharacterRace,    // race / tribe / sex bundle
-        CharacterJob,     // job / level bundle
-        CharacterTitle,
-        CharacterMount,   // mount / minion bundle
+        CharacterMount,   // bundle: mount, minion
 
         // Affiliation group
         FreeCompany,

@@ -21,12 +21,9 @@ namespace Sightseeingway.UI.Components
             ("Scene", MetadataField.Shader,   "Shader Preset",          "Active Shadingway preset, when Shadingway is detected."),
 
             // Character
-            ("Character", MetadataField.CharacterName,  "Character Name",      "Character name."),
-            ("Character", MetadataField.CharacterWorld, "World",               "Current and home server."),
-            ("Character", MetadataField.CharacterRace,  "Race / Tribe / Sex",  "Visual character identity."),
-            ("Character", MetadataField.CharacterJob,   "Job / Level",         "Active class/job and level."),
-            ("Character", MetadataField.CharacterTitle, "Title",               "Currently displayed title."),
-            ("Character", MetadataField.CharacterMount, "Mount / Minion",      "Currently summoned mount and minion."),
+            ("Character", MetadataField.CharacterData,  "Character Data",  "Bundled: name, race/tribe/sex, job/level, title."),
+            ("Character", MetadataField.CharacterWorld, "World",           "Current and home server."),
+            ("Character", MetadataField.CharacterMount, "Mount / Minion",  "Currently summoned mount and minion."),
 
             // Affiliation
             ("Affiliation", MetadataField.FreeCompany,  "Free Company",  "FC name and tag."),

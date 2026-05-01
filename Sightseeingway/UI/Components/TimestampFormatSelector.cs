@@ -1,5 +1,4 @@
 using Dalamud.Bindings.ImGui;
-using System;
 
 namespace Sightseeingway.UI.Components
 {
@@ -28,13 +27,6 @@ namespace Sightseeingway.UI.Components
                 currentFormat = (TimestampFormat)formatIndex;
                 changed = true;
             }
-
-            // Sample at render time so examples reflect the current moment.
-            var now = DateTime.Now;
-            ImGui.TextWrapped("Examples:");
-            ImGui.TextColored(Constants.UI.ExampleColor, "Compact: " + FilenameGenerator.FormatTimestamp(now, TimestampFormat.Compact));
-            ImGui.TextColored(Constants.UI.ExampleColor, "Regular: " + FilenameGenerator.FormatTimestamp(now, TimestampFormat.Regular));
-            ImGui.TextColored(Constants.UI.ExampleColor, "Readable: " + FilenameGenerator.FormatTimestamp(now, TimestampFormat.Readable));
 
             return changed;
         }

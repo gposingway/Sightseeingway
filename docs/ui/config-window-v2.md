@@ -72,11 +72,8 @@ state.
 | Scene | Weather | ON |
 | Scene | Flags | ON |
 | Scene | Shader | ON |
-| Character | Name | ON *(grandfathered from filename default)* |
+| Character | Character Data (name, race/tribe/sex, job/level, title) | ON |
 | Character | World | OFF |
-| Character | Race / Tribe / Sex | ON |
-| Character | Job / Level | ON |
-| Character | Title | OFF |
 | Character | Mount / Minion | ON |
 | Affiliation | Free Company | OFF |
 | Affiliation | Grand Company | OFF |
