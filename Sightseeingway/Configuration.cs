@@ -1,5 +1,5 @@
 using Dalamud.Configuration;
-using Dalamud.Plugin;
+using Newtonsoft.Json;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,33 +9,42 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public int Version { get; set; } = 4; // Incremented version due to adding show name changes in chat option
+        public int Version { get; set; } = 4;
 
-        // Stores selected fields as a comma-separated string in display order.
-        // Example: "Timestamp,CharacterName,MapName,Position,EorzeaTime,Weather,ShaderPreset"
-        public string SelectedFields { get; set; } = GetDefaultSelectedFields();
+        private string _selectedFields = GetDefaultSelectedFields();
+        private List<FilenameField>? _cachedFields;
 
-        // The format to use for timestamps in filenames
+        // Persisted as a comma-separated string for back-compat (e.g. "Timestamp,CharacterName,...").
+        public string SelectedFields
+        {
+            get => _selectedFields;
+            set
+            {
+                _selectedFields = value;
+                _cachedFields = null;
+            }
+        }
+
+        // Typed accessor — parses once and caches until SelectedFields is reassigned.
+        [JsonIgnore]
+        public IReadOnlyList<FilenameField> Fields =>
+            _cachedFields ??= FilenameGenerator.StringToFieldList(_selectedFields);
+
         public TimestampFormat TimestampFormat { get; set; } = TimestampFormat.Compact;
-        
-        // Debug Mode toggle
+
         public bool DebugMode { get; set; } = false;
 
-        // Whether to show name changes in chat window
         public bool ShowNameChangesInChat { get; set; } = true;
 
         public static string GetDefaultSelectedFields() =>
             string.Join(",", Enum.GetValues(typeof(FilenameField)).Cast<FilenameField>().Select(f => f.ToString()));
 
-        public void Save()
-        {
-            Plugin.PluginInterface.SavePluginConfig(this);
-        }
+        public void Save() => Plugin.PluginInterface.SavePluginConfig(this);
     }
 
     public enum FilenameField
     {
-        Timestamp, 
+        Timestamp,
         CharacterName,
         MapName,
         Position,
@@ -46,8 +55,8 @@ namespace Sightseeingway
 
     public enum TimestampFormat
     {
-        Compact,    // yyyyMMddHHmmssfff (e.g., 20250507123045678)
-        Regular,    // yyyyMMdd-HHmmss-fff (e.g., 20250507-123045-678)
-        Readable    // yyyy-MM-dd_HH-mm-ss.fff (e.g., 2025-05-07_12-30-45.678)
+        Compact,    // yyyyMMddHHmmssfff
+        Regular,    // yyyyMMdd-HHmmss-fff
+        Readable    // yyyy-MM-dd_HH-mm-ss.fff
     }
 }

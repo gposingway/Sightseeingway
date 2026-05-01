@@ -18,9 +18,9 @@ namespace Sightseeingway
         {
             return format switch
             {
-                TimestampFormat.Regular => dateTime.ToString("yyyyMMdd-HHmmss-fff"),
-                TimestampFormat.Readable => dateTime.ToString("yyyy-MM-dd_HH-mm-ss.fff"),
-                TimestampFormat.Compact or _ => dateTime.ToString("yyyyMMddHHmmssfff"),
+                TimestampFormat.Regular => dateTime.ToString(Constants.Formats.RegularTimestamp),
+                TimestampFormat.Readable => dateTime.ToString(Constants.Formats.ReadableTimestamp),
+                _ => dateTime.ToString(Constants.Formats.CompactTimestamp),
             };
         }
 
@@ -33,22 +33,22 @@ namespace Sightseeingway
         }
 
         /// <summary>
-        /// Creates an ordered list of FilenameField items from a comma-separated string
+        /// Creates an ordered list of FilenameField items from a comma-separated string.
         /// </summary>
         public static List<FilenameField> StringToFieldList(string? fieldsString)
         {
             if (string.IsNullOrEmpty(fieldsString)) return new List<FilenameField>();
-            
-            return fieldsString.Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries)
-                .Select(s => Enum.TryParse<FilenameField>(s.Trim(), out var field) ? field : (FilenameField?)null)
+
+            return fieldsString.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                .Select(s => Enum.TryParse<FilenameField>(s, out var field) ? (FilenameField?)field : null)
                 .Where(f => f.HasValue)
                 .Select(f => f!.Value)
-                .Distinct() // Ensure no duplicates from string
+                .Distinct()
                 .ToList();
         }
 
         /// <summary>
-        /// Converts a list of FilenameField items to a comma-separated string
+        /// Converts a list of FilenameField items to a comma-separated string.
         /// </summary>
         public static string FieldListToString(IEnumerable<FilenameField> fieldList)
         {
@@ -56,16 +56,16 @@ namespace Sightseeingway
         }
 
         /// <summary>
-        /// Ensures Timestamp is the first field in the list, adding it if missing
+        /// Returns a new list with Timestamp guaranteed at index 0. Does not mutate the input.
         /// </summary>
-        public static List<FilenameField> EnsureTimestampIsFirst(List<FilenameField> fields)
+        public static List<FilenameField> EnsureTimestampIsFirst(IEnumerable<FilenameField> fields)
         {
-            if (!fields.Any() || fields[0] != FilenameField.Timestamp)
+            var list = new List<FilenameField> { FilenameField.Timestamp };
+            foreach (var f in fields)
             {
-                fields.Remove(FilenameField.Timestamp); // Remove if it exists elsewhere
-                fields.Insert(0, FilenameField.Timestamp); // Add to the beginning
+                if (f != FilenameField.Timestamp && !list.Contains(f)) list.Add(f);
             }
-            return fields;
+            return list;
         }
 
         /// <summary>

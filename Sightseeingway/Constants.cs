@@ -1,6 +1,3 @@
-// filepath: f:\Replica\NAS\Files\repo\github\Sightseeingway\Sightseeingway\Constants.cs
-using System;
-using System.Collections.Generic;
 using System.Numerics;
 
 namespace Sightseeingway
@@ -52,19 +49,22 @@ namespace Sightseeingway
         {
             public static readonly Vector2 DefaultWindowSize = new(550, 600);
             public static readonly Vector4 HeaderColor = new(0.7f, 0.9f, 1.0f, 1.0f);
+            public static readonly Vector4 SectionAccentColor = new(0.0f, 0.85f, 1.0f, 1.0f);
+            public static readonly Vector4 FieldHeaderColor = new(1.0f, 0.85f, 0.0f, 1.0f);
             public static readonly Vector4 InfoColor = new(0.8f, 0.8f, 0.5f, 1.0f);
             public static readonly Vector4 ExampleHeaderColor = new(0.5f, 0.9f, 0.5f, 1.0f);
             public static readonly Vector4 ExampleColor = new(1.0f, 1.0f, 1.0f, 1.0f);
             public static readonly Vector4 MandatoryFieldBg = new(0.3f, 0.3f, 0.5f, 0.5f);
             public static readonly Vector4 LinkColor = new(0.6f, 0.8f, 1.0f, 1.0f);
-            
+
+            public const float ButtonRowReservedHeight = 182f;
+            public const float ExampleBoxHeight = 60f;
+            public const float ButtonHeight = 24f;
+            public const float ButtonRowMargin = 40f;
+            public const float ButtonGap = 10f;
+            public const float DebugCheckboxOffsetRatio = 0.7f;
+
             public const string ShadingwayRepoUrl = "https://github.com/gposingway/shadingway";
-        }
-        
-        // Caching
-        public static class Caching
-        {
-            public static readonly TimeSpan CacheDuration = TimeSpan.FromMinutes(1);
         }
     }
 }
