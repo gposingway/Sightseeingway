@@ -1,4 +1,3 @@
-// filepath: f:\Replica\NAS\Files\repo\github\Sightseeingway\Sightseeingway\Services\Logger.cs
 using Dalamud.Plugin.Services;
 using System;
 using System.IO;
@@ -35,11 +34,9 @@ namespace Sightseeingway.Services
         {
             string locationInfo = FormatLocationInfo(filePath, lineNumber, caller);
             _log?.Debug($"{locationInfo}{message}");
-            
-            // If debug mode is enabled, also print to chat
+
             if (_debugMode)
             {
-                // IMPORTANT: Use direct chat printing instead of Client.PrintMessage to avoid circular dependency
                 SafePrintToChat($"Debug: {message} {locationInfo}");
             }
         }
@@ -131,7 +128,6 @@ namespace Sightseeingway.Services
         /// </summary>
         public void UserMessage(string message)
         {
-            // IMPORTANT: Direct chat printing instead of using Client.PrintMessage
             SafePrintToChat(message);
         }
 
@@ -155,25 +151,18 @@ namespace Sightseeingway.Services
             return $"[{fileName}:{lineNumber} in {caller}] ";
         }
         
-        /// <summary>
-        /// Safe direct method to print to chat without using Client class
-        /// to avoid circular dependencies
-        /// </summary>
         private void SafePrintToChat(string message)
         {
             if (_chatGui == null) return;
-            
+
             try
             {
-                var pluginName = "Sightseeingway";
-                var payloads = new System.Collections.Generic.List<Payload> { new TextPayload(message) };
-                
                 var seStringBuilder = new SeStringBuilder();
                 seStringBuilder.AddUiForeground(548);
-                seStringBuilder.AddText($"[{pluginName}] ");
+                seStringBuilder.AddText($"{Constants.Plugin.ChatPrefix} ");
                 seStringBuilder.AddUiForegroundOff();
                 seStringBuilder.AddText(message);
-                
+
                 _chatGui.Print(new XivChatEntry
                 {
                     Message = seStringBuilder.BuiltString,
