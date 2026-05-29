@@ -285,6 +285,11 @@ namespace Sightseeingway
 
             var character = snapshot.Character?.Name ?? string.Empty;
             var map = snapshot.Location?.Map?.Name ?? string.Empty;
+            // Landmark: most specific place name available, falling back to the zone.
+            // The de-dup in GenerateFilename drops it when it would just repeat the Zone field.
+            var subLocation = snapshot.Location?.SubArea?.Name
+                ?? snapshot.Location?.Area?.Name
+                ?? map;
             var position = FormatPositionForFilename(snapshot.Location?.Position);
             var eorzeaTime = snapshot.Time?.Eorzea?.Period ?? string.Empty;
             var weather = snapshot.Weather?.Name ?? string.Empty;
@@ -298,6 +303,7 @@ namespace Sightseeingway
                 config.TimestampFormat,
                 character,
                 map,
+                subLocation,
                 position,
                 eorzeaTime,
                 weather,

@@ -15,6 +15,7 @@ namespace Sightseeingway.UI.Components
             { FilenameField.Timestamp, "Timestamp" },
             { FilenameField.CharacterName, "Character Name" },
             { FilenameField.MapName, "Map/Zone Name" },
+            { FilenameField.SubLocation, "Landmark" },
             { FilenameField.Position, "Position Coordinates" },
             { FilenameField.EorzeaTime, "Eorzea Time Period" },
             { FilenameField.Weather, "Weather" },
@@ -123,6 +124,21 @@ namespace Sightseeingway.UI.Components
                     changed = true;
                 }
                 ImGui.EndDisabled();
+
+                // Explain the intermittent-but-self-completing Landmark field.
+                if (field == FilenameField.SubLocation)
+                {
+                    ImGui.SameLine();
+                    ImGui.TextColored(Constants.UI.InfoColor, "(?)");
+                    if (ImGui.IsItemHovered())
+                    {
+                        ImGui.BeginTooltip();
+                        ImGui.Text("The specific spot you're standing in, e.g. \"Summerford Farms\".");
+                        ImGui.Text("Falls back to the zone name when there's no named landmark,");
+                        ImGui.Text("and won't repeat the Map/Zone Name field when they'd be the same.");
+                        ImGui.EndTooltip();
+                    }
+                }
 
                 // Add Shadingway link for ShaderPreset field
                 if (field == FilenameField.ShaderPreset)

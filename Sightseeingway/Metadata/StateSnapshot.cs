@@ -155,7 +155,12 @@ namespace Sightseeingway.Metadata
     public sealed record LocationInfo(
         [property: JsonProperty("territory", NullValueHandling = NullValueHandling.Ignore)] NamedId? Territory,
         [property: JsonProperty("map", NullValueHandling = NullValueHandling.Ignore)] NamedId? Map,
-        [property: JsonProperty("position", NullValueHandling = NullValueHandling.Ignore)] Position? Position);
+        [property: JsonProperty("position", NullValueHandling = NullValueHandling.Ignore)] Position? Position,
+        // The map's live breadcrumb tiers below the zone, from TerritoryInfo:
+        // Area = mid tier (e.g. "Summerford"), SubArea = landmark (e.g. "Summerford Farms").
+        // Either may be null when the player isn't standing in a named area.
+        [property: JsonProperty("area", NullValueHandling = NullValueHandling.Ignore)] NamedId? Area = null,
+        [property: JsonProperty("subArea", NullValueHandling = NullValueHandling.Ignore)] NamedId? SubArea = null);
 
     public sealed record Position(
         [property: JsonProperty("x")] float X,

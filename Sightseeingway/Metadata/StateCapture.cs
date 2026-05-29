@@ -148,15 +148,56 @@ namespace Sightseeingway.Metadata
                     Plugin.Logger?.Debug($"Position capture failed: {ex.Message}");
                 }
 
-                if (mapNamed == null && territoryNamed == null && position == null)
+                var (area, subArea) = TryCaptureSubArea();
+
+                if (mapNamed == null && territoryNamed == null && position == null
+                    && area == null && subArea == null)
                     return null;
 
-                return new LocationInfo(territoryNamed, mapNamed, position);
+                return new LocationInfo(territoryNamed, mapNamed, position, area, subArea);
             }
             catch (Exception ex)
             {
                 Plugin.Logger?.Debug($"Location capture failed: {ex.Message}");
                 return null;
+            }
+        }
+
+        /// <summary>
+        /// Reads the map's live breadcrumb tiers below the zone from the game's
+        /// <c>TerritoryInfo</c> singleton: Area (mid tier, e.g. "Summerford") and
+        /// SubArea (landmark, e.g. "Summerford Farms"). Both are commonly absent —
+        /// the IDs are 0 over open ground and in most instances — so absence is the
+        /// normal case, not an error. Must run on the framework thread (same context
+        /// as <see cref="TryCaptureWeather"/>).
+        /// </summary>
+        private static unsafe (NamedId? Area, NamedId? SubArea) TryCaptureSubArea()
+        {
+            try
+            {
+                var info = FFXIVClientStructs.FFXIV.Client.Game.UI.TerritoryInfo.Instance();
+                if (info == null) return (null, null);
+
+                var placeNames = Plugin.DataManager.GetExcelSheet<PlaceName>();
+                if (placeNames == null) return (null, null);
+
+                NamedId? Resolve(uint id)
+                {
+                    if (id == 0) return null;
+                    var row = placeNames.GetRow(id);
+                    if (row.RowId == 0) return null;
+                    var name = row.Name.ExtractText();
+                    return string.IsNullOrEmpty(name) ? null : new NamedId(id, name);
+                }
+
+                var area = Resolve(info->AreaPlaceNameId);
+                var subArea = Resolve(info->SubAreaPlaceNameId);
+                return (area, subArea);
+            }
+            catch (Exception ex)
+            {
+                Plugin.Logger?.Debug($"SubArea capture failed: {ex.Message}");
+                return (null, null);
             }
         }
 

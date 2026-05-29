@@ -213,6 +213,7 @@ namespace Sightseeingway
             }
 
             var map = "Unknown";
+            var subLocation = "";
             var position = "";
             var eorzeaTime = "";
             var weather = "";
@@ -247,6 +248,8 @@ namespace Sightseeingway
 
                     weather = Client.GetCurrentWeatherName();
                     eorzeaTime = Client.GetCurrentEorzeaDateTime().DetermineDayPeriod(true);
+                    // Landmark for the preview: most specific place name, else the zone.
+                    subLocation = Client.GetCurrentLandmarkName() ?? map;
                 }
                 catch (Exception ex)
                 {
@@ -257,7 +260,13 @@ namespace Sightseeingway
             filenamePreview.RefreshPreview(
                 tempConfig.TimestampFormat,
                 fieldOrdering.GetActiveFieldsInOrder(),
-                character, map, position, eorzeaTime, weather, shaderPreset);
+                characterName: character,
+                map: map,
+                subLocation: subLocation,
+                position: position,
+                eorzeaTime: eorzeaTime,
+                weather: weather,
+                shaderPreset: shaderPreset);
 
             // Metadata preview — uses live state when available, otherwise example data.
             StateSnapshot snapshot;

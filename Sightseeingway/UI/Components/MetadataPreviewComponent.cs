@@ -77,7 +77,8 @@ namespace Sightseeingway.UI.Components
             Location = new LocationInfo(
                 new NamedId(129, "Limsa Lominsa Upper Decks"),
                 new NamedId(12, "Limsa Lominsa Upper Decks"),
-                new Position(10.5f, 15.2f, 0.0f)),
+                new Position(10.5f, 15.2f, 0.0f),
+                SubArea: new NamedId(52, "Hawkers' Alley")),
             Time = new TimeInfo(new EorzeaTime("Day", 14)),
             Weather = new NamedId(1, "Clear Skies"),
             Shader = new ShaderInfo("Witch's Presets", "Witch'sOccult", "E:\\Games\\reshade-presets\\Witch's Presets\\Witch'sOccult.ini"),

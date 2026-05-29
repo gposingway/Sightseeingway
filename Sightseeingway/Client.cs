@@ -23,6 +23,32 @@ namespace Sightseeingway
             return string.IsNullOrEmpty(currentWeatherName) ? "Unknown Weather" : currentWeatherName;
         }
 
+        /// <summary>
+        /// The map's most specific live place name where the player stands —
+        /// the landmark sub-area (e.g. "Summerford Farms"), else the parent area
+        /// (e.g. "Summerford"), else null when in unnamed ground. Used to preview
+        /// the filename; the snapshot path resolves the same data in StateCapture.
+        /// </summary>
+        public static unsafe string? GetCurrentLandmarkName()
+        {
+            var info = FFXIVClientStructs.FFXIV.Client.Game.UI.TerritoryInfo.Instance();
+            if (info == null) return null;
+
+            var placeNames = Plugin.DataManager?.GetExcelSheet<PlaceName>();
+            if (placeNames == null) return null;
+
+            string? Resolve(uint id)
+            {
+                if (id == 0) return null;
+                var row = placeNames.GetRow(id);
+                if (row.RowId == 0) return null;
+                var name = row.Name.ExtractText();
+                return string.IsNullOrEmpty(name) ? null : name;
+            }
+
+            return Resolve(info->SubAreaPlaceNameId) ?? Resolve(info->AreaPlaceNameId);
+        }
+
         public static DateTime GetCurrentEorzeaDateTime()
         {
             try

@@ -10,6 +10,7 @@ Take Sightseeingway with you! This Dalamud addon for FFXIV automatically names y
 
   * **Character Name:**  Know exactly which character took the screenshot.
   * **Map Name:**  Quickly identify the in-game zone where the screenshot was taken.
+  * **Landmark:**  Capture the specific spot you're standing in (e.g. *Summerford Farms*), so explorer and landmark shots name themselves.
   * **Coordinates (X, Y):** Pinpoint the exact location on the map.
   * **Eorzea Time:**  Records the in-game time of day, helping you remember the lighting conditions.
   * **Weather:**  Captures the in-game weather, useful for scenic shots with specific weather effects.
@@ -47,9 +48,9 @@ You can customize the filename format through the Sightseeingway settings panel,
 
 By default, screenshots will be named using the following format:
 
-`[Timestamp]-[CharacterName]-[MapName]-[Position (X,Y,Z)]-[EorzeaTimePeriod]-[Weather]-[ShaderPreset].[Extension]`
+`[Timestamp]-[CharacterName]-[MapName]-[Landmark]-[Position (X,Y,Z)]-[EorzeaTimePeriod]-[Weather]-[ShaderPreset].[Extension]`
 
-Example: `20250506103045123-WolOfLight-LimsaLominsaUpperDecks (10.5,15.2)-Day-ClearSkies.png`
+Example: `20250506103045123-WolOfLight-Middle La Noscea-Summerford Farms (23.4,18.1)-Day-ClearSkies.png`
 
 **Filename Elements:**
 
@@ -59,6 +60,7 @@ Example: `20250506103045123-WolOfLight-LimsaLominsaUpperDecks (10.5,15.2)-Day-Cl
     * **Readable:** `yyyy-MM-dd_HH-mm-ss.fff` (e.g., 2025-05-07_12-30-45.678)
 *   **CharacterName:** Your current character's name.
 *   **MapName:** The name of the current map or zone.
+*   **Landmark:** The most specific named place where you're standing (e.g. *Summerford Farms*), falling back to the zone name when there's no named landmark. It won't repeat the MapName element when the two would be identical, so you can safely enable both.
 *   **Position:** Your character's X, Y (and Z if applicable) coordinates on the map.
 *   **EorzeaTimePeriod:** The current Eorzea time period (e.g., Day, Night, Dawn, Dusk).
 *   **Weather:** The current weather in the zone.

@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <IsPackable>false</IsPackable>
+    <IsPublishable>false</IsPublishable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.5" />
+  </ItemGroup>
+
+  <!--
+    Link the plugin's pure, Dalamud-free logic so it can be unit-tested without the
+    game libraries. These files intentionally have no Dalamud/Lumina dependencies.
+  -->
+  <ItemGroup>
+    <Compile Include="..\Sightseeingway\FilenameGenerator.cs" Link="Linked\FilenameGenerator.cs" />
+    <Compile Include="..\Sightseeingway\FilenameField.cs" Link="Linked\FilenameField.cs" />
+    <Compile Include="..\Sightseeingway\Constants.cs" Link="Linked\Constants.cs" />
+  </ItemGroup>
+
+</Project>

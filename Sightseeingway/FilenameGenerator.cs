@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
-using System.Numerics;
-using Lumina.Excel.Sheets;
 
 namespace Sightseeingway
 {
@@ -76,6 +74,7 @@ namespace Sightseeingway
             TimestampFormat timestampFormat,
             string character,
             string map,
+            string subLocation,
             string position,
             string eorzeaTime,
             string weather,
@@ -99,6 +98,17 @@ namespace Sightseeingway
                         break;
                     case FilenameField.MapName:
                         parts.Add(FormatNamePart(map));
+                        break;
+                    case FilenameField.SubLocation:
+                        // The landmark resolves to the most specific place name available
+                        // (sub-area → area → zone). De-dup: when the Zone (MapName) field is
+                        // also active and would emit the same text, suppress the landmark so
+                        // the location isn't repeated. Order-independent — keyed on whether
+                        // MapName is active, not on emission order.
+                        var zoneAlsoShown = activeFieldsInOrder.Contains(FilenameField.MapName)
+                            && string.Equals(subLocation, map, StringComparison.Ordinal);
+                        if (!zoneAlsoShown)
+                            parts.Add(FormatNamePart(subLocation));
                         break;
                     case FilenameField.Position:
                         parts.Add(position); // Position already has spaces or is empty

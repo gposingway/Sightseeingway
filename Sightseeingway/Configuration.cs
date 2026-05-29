@@ -104,24 +104,6 @@ namespace Sightseeingway
         }
     }
 
-    public enum FilenameField
-    {
-        Timestamp,
-        CharacterName,
-        MapName,
-        Position,
-        EorzeaTime,
-        Weather,
-        ShaderPreset,
-    }
-
-    public enum TimestampFormat
-    {
-        Compact,    // yyyyMMddHHmmssfff
-        Regular,    // yyyyMMdd-HHmmss-fff
-        Readable,   // yyyy-MM-dd_HH-mm-ss.fff
-    }
-
     /// <summary>
     /// Field keys for metadata embedding. Each maps to one or more
     /// <see cref="StateSnapshot"/> branches that can be independently
