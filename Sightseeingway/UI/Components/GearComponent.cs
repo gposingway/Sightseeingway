@@ -1,16 +1,26 @@
-using Dalamud.Bindings.ImGui;
+using System;
+using System.Collections.Generic;
 using System.Numerics;
+using Dalamud.Bindings.ImGui;
+using Dalamud.Interface.Textures;
+using Sightseeingway.Gear;
 
 namespace Sightseeingway.UI.Components
 {
     /// <summary>
-    /// "Gear" tab: opt-in to publish the player's visible gear to Shadingway, with
-    /// live detection/status from the running <see cref="Gear.GearPublisher"/>.
+    /// "Gear" tab: opt-in to publish the player's visible gear to Shadingway, a live
+    /// preview of exactly what is being published (icons / names / dyes), and the
+    /// running publisher's detection/status.
     /// </summary>
     public class GearComponent
     {
         private static readonly Vector4 OkColor = new(0.40f, 0.90f, 0.40f, 1f);
         private static readonly Vector4 WarnColor = new(0.95f, 0.65f, 0.25f, 1f);
+
+        // Cached preview snapshot, refreshed on a throttle (Draw runs on the framework
+        // thread, so reading live game state here is safe — just not every frame).
+        private IReadOnlyList<GearSlotData> _cached = Array.Empty<GearSlotData>();
+        private long _lastRefreshTicks;
 
         public bool Render(Configuration tempConfig)
         {
@@ -49,15 +59,101 @@ namespace Sightseeingway.UI.Components
             ImGui.Separator();
             ImGui.Spacing();
 
-            ImGui.TextDisabled("Published per equipped slot:");
-            ImGui.BulletText("GLAM_<slot>_ICON  — item icon, native resolution");
-            ImGui.BulletText("GLAM_<slot>_NAME  — item name (r8 coverage, tint in-shader)");
-            ImGui.BulletText("GLAM_<slot>_RARITY — name colour swatch (8x8)");
-            ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye channel colours (8x8)");
+            ImGui.TextColored(Constants.UI.FieldHeaderColor, "Current visible gear");
+            ImGui.TextWrapped("Exactly what gets published — verify your glamour, icons and dyes here.");
             ImGui.Spacing();
-            ImGui.TextDisabled("Each texture also auto-reports its size via the shadingway metric uniform.");
+            DrawGearPreview();
+
+            ImGui.Spacing();
+            if (ImGui.CollapsingHeader("Published texture names (per slot)"))
+            {
+                ImGui.BulletText("GLAM_<slot>_ICON  — item icon, native resolution");
+                ImGui.BulletText("GLAM_<slot>_NAME  — item name (r8 coverage, tint in-shader)");
+                ImGui.BulletText("GLAM_<slot>_RARITY — name colour swatch (8x8)");
+                ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye channel colours (8x8)");
+                ImGui.TextDisabled("Each also auto-reports its size via the shadingway metric uniform.");
+            }
 
             return changed;
+        }
+
+        private void DrawGearPreview()
+        {
+            var now = Environment.TickCount64;
+            if (now - _lastRefreshTicks > 500)
+            {
+                try { _cached = GearReader.ReadVisibleGear(); }
+                catch (Exception ex) { Plugin.Logger?.Debug($"Gear preview read failed: {ex.Message}"); }
+                _lastRefreshTicks = now;
+            }
+
+            if (_cached.Count == 0)
+            {
+                ImGui.TextDisabled("No visible gear detected (not logged in, or nothing equipped).");
+                return;
+            }
+
+            const ImGuiTableFlags flags =
+                ImGuiTableFlags.RowBg | ImGuiTableFlags.BordersInnerH | ImGuiTableFlags.SizingFixedFit;
+
+            if (ImGui.BeginTable("##GearPreview", 4, flags))
+            {
+                ImGui.TableSetupColumn("Icon");
+                ImGui.TableSetupColumn("Slot");
+                ImGui.TableSetupColumn("Item", ImGuiTableColumnFlags.WidthStretch);
+                ImGui.TableSetupColumn("Dyes");
+                ImGui.TableHeadersRow();
+
+                foreach (var slot in _cached)
+                {
+                    ImGui.TableNextRow();
+
+                    ImGui.TableNextColumn();
+                    DrawIcon(slot.IconId, 32f);
+
+                    ImGui.TableNextColumn();
+                    ImGui.AlignTextToFramePadding();
+                    ImGui.TextUnformatted(slot.Slot.Key);
+
+                    ImGui.TableNextColumn();
+                    ImGui.AlignTextToFramePadding();
+                    var (r, g, b) = SwatchFactory.RarityColor(slot.Rarity);
+                    ImGui.TextColored(new Vector4(r / 255f, g / 255f, b / 255f, 1f), slot.Name);
+
+                    ImGui.TableNextColumn();
+                    DrawDye(slot.Stain0Color);
+                    ImGui.SameLine();
+                    DrawDye(slot.Stain1Color);
+                }
+
+                ImGui.EndTable();
+            }
+        }
+
+        private static void DrawIcon(uint iconId, float size)
+        {
+            if (iconId != 0)
+            {
+                var shared = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(iconId));
+                var wrap = shared.GetWrapOrEmpty();
+                ImGui.Image(wrap.Handle, new Vector2(size, size));
+                return;
+            }
+            ImGui.Dummy(new Vector2(size, size));
+        }
+
+        private static void DrawDye(uint seColor)
+        {
+            var box = new Vector2(16f, 16f);
+            if (seColor == 0)
+            {
+                ImGui.Dummy(box);
+                return;
+            }
+
+            var (r, g, b) = SwatchFactory.SeColorToRgb(seColor);
+            ImGui.ColorButton("##dye", new Vector4(r / 255f, g / 255f, b / 255f, 1f),
+                ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoPicker, box);
         }
 
         private static void DrawStatus(Configuration tempConfig)
