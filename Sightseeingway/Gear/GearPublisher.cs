@@ -50,12 +50,14 @@ namespace Sightseeingway.Gear
         // Cross-thread state.
         private volatile bool _publishing;
         private volatile bool _probing;
+        private volatile bool _forceFull; // set by the UI "Re-publish now" button
         private volatile int _pushedCount;
         private volatile string _statusLine = "Idle";
 
         // Worker-owned state — touched only while holding _gate.
         private readonly Dictionary<string, string> _publishedSlots = new(); // slot key → published signature
         private readonly HashSet<string> _publishedNames = new();            // resident texture names on the bus
+        private bool _wasConnected;                                          // were we connected last cycle?
         private int? _connectedPid;                                          // pid we last synced with
 
         public string StatusLine => _statusLine;
@@ -86,6 +88,13 @@ namespace Sightseeingway.Gear
             try { await _client.DiscoverAsync(Plugin.Config.GearShadingwayPort, _cts.Token); }
             catch (Exception ex) { Plugin.Logger?.Debug($"Shadingway probe failed: {ex.Message}"); }
             finally { _probing = false; }
+        }
+
+        /// <summary>Forces the next cycle to re-send the full current set (manual test trigger).</summary>
+        public void RequestResync()
+        {
+            _forceFull = true;
+            _lastSyncTicks = 0; // make the next poll trigger immediately
         }
 
         private void OnUpdate(IFramework framework)
@@ -154,16 +163,20 @@ namespace Sightseeingway.Gear
             var baseUrl = await _client.DiscoverAsync(Plugin.Config.GearShadingwayPort, ct);
             if (baseUrl == null)
             {
-                // Disconnected: leave our published-state intact. If Shadingway comes back
-                // as the same pid its bus still holds our textures (delta resumes); a new
-                // pid is treated as a reconnect and re-sends everything.
+                // Disconnected. Record it so the next successful connect re-sends the full
+                // set — we can't assume the bus still holds our textures after a gap.
+                _wasConnected = false;
                 _statusLine = "Shadingway not found";
                 return;
             }
 
             var pid = _client.DiscoveredPid;
-            var reconnect = pid != _connectedPid;
+            // Send all on a (re)connection: we were disconnected, or it's a new Shadingway
+            // instance (changed pid), or a manual re-publish. Otherwise just the diff.
+            var reconnect = !_wasConnected || pid != _connectedPid || _forceFull;
+            _wasConnected = true;
             _connectedPid = pid;
+            _forceFull = false;
 
             var current = new Dictionary<string, GearSlotData>(slots.Count);
             foreach (var s in slots) current[s.Slot.Key] = s;
@@ -190,17 +203,27 @@ namespace Sightseeingway.Gear
                 return;
             }
 
-            foreach (var s in toPush) await PublishSlotAsync(baseUrl, s, ct);
+            var ok = 0;
+            var total = 0;
+            foreach (var s in toPush)
+            {
+                var (slotOk, slotTotal) = await PublishSlotAsync(baseUrl, s, ct);
+                ok += slotOk;
+                total += slotTotal;
+            }
             foreach (var key in toRemove) await RemoveSlotAsync(baseUrl, key, ct);
 
             _pushedCount = _publishedNames.Count;
-            _statusLine = reconnect
-                ? $"Connected — sent {toPush.Count} slot(s)"
-                : $"Updated {toPush.Count} changed, {toRemove.Count} removed";
+            var scope = reconnect ? "full" : "delta";
+            _statusLine = $"Sent {ok}/{total} textures · {toPush.Count} slot(s) {scope}, {toRemove.Count} removed";
+            Plugin.Logger?.Debug($"Gear publish ({scope}): {ok}/{total} POSTs ok across {toPush.Count} slot(s).");
         }
 
-        /// <summary>Builds and pushes one slot's textures, clearing any of its now-stale names.</summary>
-        private async Task PublishSlotAsync(string baseUrl, GearSlotData slot, CancellationToken ct)
+        /// <summary>
+        /// Builds and pushes one slot's textures, clearing any of its now-stale names.
+        /// Returns (successful POSTs, attempted POSTs).
+        /// </summary>
+        private async Task<(int Ok, int Total)> PublishSlotAsync(string baseUrl, GearSlotData slot, CancellationToken ct)
         {
             var built = new List<PushTexture>();
             var newNames = new HashSet<string>();
@@ -224,7 +247,9 @@ namespace Sightseeingway.Gear
                 Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye2),
                     Swatch(SwatchFactory.StainSwatch(slot.Stain1Color)));
 
-            foreach (var t in built) await _client.PostTextureAsync(baseUrl, t, ct);
+            var ok = 0;
+            foreach (var t in built)
+                if (await _client.PostTextureAsync(baseUrl, t, ct)) ok++;
 
             // Delete any of this slot's names that are no longer present (e.g. a removed dye),
             // then make _publishedNames reflect exactly this slot's current set.
@@ -238,6 +263,7 @@ namespace Sightseeingway.Gear
             foreach (var n in newNames) _publishedNames.Add(n);
 
             _publishedSlots[slot.Slot.Key] = slot.Signature();
+            return (ok, built.Count);
         }
 
         /// <summary>Deletes everything for a slot that is no longer worn.</summary>
@@ -276,6 +302,7 @@ namespace Sightseeingway.Gear
                 _publishedNames.Clear();
                 _publishedSlots.Clear();
                 _connectedPid = null;
+                _wasConnected = false; // a later re-enable re-sends everything
                 _pushedCount = 0;
                 _statusLine = "Cleared";
                 _gate.Release();

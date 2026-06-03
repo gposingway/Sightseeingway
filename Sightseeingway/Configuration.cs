@@ -10,7 +10,7 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public const int CurrentVersion = 6;
+        public const int CurrentVersion = 7;
 
         public int Version { get; set; } = CurrentVersion;
 
@@ -49,8 +49,12 @@ namespace Sightseeingway
 
         // --- v1.5 additions: Gear publishing (glamour texture bus → Shadingway) ---
 
-        /// <summary>Opt-in: push the player's visible gear as textures to Shadingway.</summary>
-        public bool GearPublishEnabled { get; set; } = false;
+        /// <summary>
+        /// Push the player's visible gear as textures to Shadingway. On by default —
+        /// it degrades silently when Shadingway isn't running, so it "just works"
+        /// when it is. Users can turn it off in the Gear tab.
+        /// </summary>
+        public bool GearPublishEnabled { get; set; } = true;
 
         /// <summary>
         /// Loopback port where Shadingway's HTTP server is expected. Discovery
@@ -118,6 +122,15 @@ namespace Sightseeingway
             if (Version < 6)
             {
                 Version = 6;
+            }
+
+            // v7: gear publishing is now on by default ("just works" when Shadingway is
+            // running). Enable it once for existing configs; an explicit later opt-out
+            // sticks because this only runs while Version < 7.
+            if (Version < 7)
+            {
+                GearPublishEnabled = true;
+                Version = 7;
             }
 #pragma warning restore CS0618
         }

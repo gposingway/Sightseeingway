@@ -340,7 +340,7 @@ namespace Sightseeingway
             tempConfig.EmbedMetadata = false;
             tempConfig.MetadataFields = Configuration.DefaultMetadataFields();
             tempConfig.LogVerbosity = LogVerbosity.Status;
-            tempConfig.GearPublishEnabled = false;
+            tempConfig.GearPublishEnabled = true;
             tempConfig.GearShadingwayPort = 48756;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
         }

@@ -95,7 +95,18 @@ namespace Sightseeingway.Gear
                 });
                 using var content = new StringContent(body, Encoding.UTF8, "application/json");
                 using var resp = await _http.PostAsync($"{baseUrl}/textures", content, ct);
-                return resp.IsSuccessStatusCode;
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var err = await resp.Content.ReadAsStringAsync(ct);
+                    if (err.Length > 200) err = err.Substring(0, 200);
+                    Plugin.Logger?.Debug($"POST {tex.Name} → {(int)resp.StatusCode}: {err}");
+                    return false;
+                }
+
+                Plugin.Logger?.Debug(
+                    $"POST {tex.Name} ({tex.Texture.Format} {tex.Texture.Width}x{tex.Texture.Height}, " +
+                    $"{tex.Texture.Data.Length}B) → OK");
+                return true;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)

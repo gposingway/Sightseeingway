@@ -195,6 +195,8 @@ namespace Sightseeingway.UI.Components
             }
 
             ImGui.Text($"Textures resident on bus: {pub.PushedCount}");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Re-publish now")) pub.RequestResync();
             ImGui.TextWrapped($"Status: {pub.StatusLine}");
         }
     }
