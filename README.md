@@ -1,6 +1,6 @@
 # Sightseeingway
 
-Take Sightseeingway with you! This Dalamud addon for FFXIV automatically names your screenshots with character and location info, so you can always find that perfect vista again. Supports standard, ReShade and GShade screenshots.
+Take Sightseeingway with you! This Dalamud addon for FFXIV automatically names your screenshots with character and location info, so you can always find that perfect vista again — and, with [Shadingway](https://github.com/gposingway/shadingway), publishes your visible glamour to ReShade so community shaders can compose live *glamour sheets*. Supports standard, ReShade and GShade screenshots.
 
 -----
 
@@ -31,6 +31,7 @@ No more generic screenshot names like `ffxiv_001.png`!  Sightseeingway helps you
   * **Configurable Filename Elements:** Select which information appears in your filenames.
   * **Element Reordering:** Arrange filename elements in your preferred order (Timestamp will always be first).
   * **Embedded Metadata** *(new in 1.3)*: Optionally embed a structured JSON record of character, location, weather, time, shader, and state flags directly into each PNG (`iTXt` chunk) or JPEG (XMP packet). Per-field opt-in with privacy-respecting defaults. See the [v1 schema](docs/schema/v1.md).
+  * **Glamour Publishing to Shadingway** *(new in 1.5)*: Publishes your currently *visible* gear — icons, names, rarity, dye colours and names, category, level, and a *Unique* tag, plus facewear and fashion accessories — as named textures to the [Shadingway](https://github.com/gposingway/shadingway) glamour bus, so ReShade shaders and presets can compose on-screen *glamour sheets*. Updates automatically as your look changes. See [Gear → Shadingway](#gear--shadingway-glamour-textures).
   * **Lightweight and Easy to Use:**  Simple drop-in addon with no complex configurations.
 
 ## Installation
@@ -69,7 +70,9 @@ Example: `20250506103045123-WolOfLight-Middle La Noscea-Summerford Farms (23.4,1
 
 ## Configuration
 
-Access the configuration window using the `/sightseeingway` chat command. The window has two columns:
+Access the configuration window using the `/sightseeingway` chat command. It is organized into two tabs — **Screenshots** and **Gear** — with live previews throughout and a **Save / Revert / Reset to Defaults** row pinned to the bottom (the title shows a `*` while you have unsaved changes).
+
+### Screenshots tab
 
 **Filename** (left):
 *   Enable or disable individual filename elements.
@@ -87,6 +90,13 @@ Access the configuration window using the `/sightseeingway` chat command. The wi
 *   Pick logging verbosity: **Quiet** (errors only), **Status** (default; rename + metadata milestones in chat), or **Debug** (full pipeline trace).
 *   Watch live pipeline status and recent events.
 *   "Open Log Folder" / "Copy Diagnostic Snapshot" for support.
+
+### Gear tab
+
+*   Toggle **Publish visible gear to Shadingway** (on by default).
+*   See live **Shadingway detection** status — the port it was found on, or a **Re-check** button when it isn't running.
+*   Review the **Current visible gear** table: exactly what's being published — icon, slot, the rarity-coloured item name with its category / level / *Unique* line, and the two dye swatches.
+*   **Re-publish now** forces a full resend; a reference list shows the per-slot texture names.
 
 ## Embedded metadata
 
@@ -108,6 +118,24 @@ recognise. Full reference: [`docs/schema/v1.md`](docs/schema/v1.md).
 A correlation ID (GUID v7) accompanies every embedded payload and links
 the file back to entries in the local pipeline log under
 `<PluginConfigDir>/logs/`, useful for diagnostics.
+
+## Gear → Shadingway (glamour textures)
+
+*New in 1.5.* When the [Shadingway](https://github.com/gposingway/shadingway) ReShade addon is running in the same game client, Sightseeingway publishes your **currently visible, glamour-aware gear** to its *glamour texture bus* — a set of named textures that community ReShade shaders and presets can sample to compose on-screen **glamour sheets** (a live, in-game outfit card).
+
+It is **glamour-aware** — it shows what's actually rendered (the glamoured appearance and its real dye colours, including glamour-plate dyes), not the underlying item — and **static**: textures are pushed once and refreshed only when your visible gear changes, so it stays cheap.
+
+For each visible slot the plugin publishes:
+
+*   the item **icon** (native resolution),
+*   the item **name** as a white-on-transparent label in four bundled fonts (Inter, Cinzel, EB Garamond, Cormorant),
+*   a **rarity** colour swatch (the in-game name colour),
+*   both **dye** colours and their **names**,
+*   the item **category**, a **level** line (*Lv. / Ilvl*), and a **Unique** tag where it applies.
+
+Slots cover the twelve equipment pieces (main/off hand, head, body, hands, legs, feet, earrings, necklace, bracelets, and both rings) plus **facewear** (Dawntrail glasses) and the active **fashion accessory** (parasol, wings, …). Each text label is white-on-transparent so a shader can tint, recolour, or invert it freely; an empty slot or absent value simply isn't bound.
+
+The feature is **on by default** and managed from the **Gear** tab (see [Configuration](#configuration)). Shader and preset authors: the full producer contract — texture names, pixel formats, the metric uniforms, and the discovery handshake — lives in [Shadingway](https://github.com/gposingway/shadingway)'s `docs/api/external-textures.md`.
 
 ## Contributing
 
