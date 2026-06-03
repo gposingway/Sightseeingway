@@ -15,7 +15,9 @@ namespace Sightseeingway.Gear
         byte Stain0,
         byte Stain1,
         uint Stain0Color,
-        uint Stain1Color)
+        uint Stain1Color,
+        string Stain0Name,
+        string Stain1Name)
     {
         /// <summary>
         /// A compact change key for this slot — what the player is visibly wearing

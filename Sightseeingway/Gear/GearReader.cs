@@ -49,6 +49,9 @@ namespace Sightseeingway.Gear
 
                     var name = row.Name.ExtractText();
 
+                    var (color0, dyeName0) = ResolveStain(stainSheet, stain0);
+                    var (color1, dyeName1) = ResolveStain(stainSheet, stain1);
+
                     result.Add(new GearSlotData(
                         slot,
                         visibleId,
@@ -57,8 +60,10 @@ namespace Sightseeingway.Gear
                         row.Rarity,
                         stain0,
                         stain1,
-                        ResolveStainColor(stainSheet, stain0),
-                        ResolveStainColor(stainSheet, stain1)));
+                        color0,
+                        color1,
+                        dyeName0,
+                        dyeName1));
                 }
 
                 // Diagnostic: equipped items present but nothing resolved usually means an
@@ -75,11 +80,12 @@ namespace Sightseeingway.Gear
         }
 
         // Resolved here (on the framework thread) so the publish worker never touches sheets.
-        private static uint ResolveStainColor(Lumina.Excel.ExcelSheet<Stain>? stainSheet, byte stainId)
+        // Returns the BGR-packed colour and the dye name; (0, "") when undyed.
+        private static (uint Color, string Name) ResolveStain(Lumina.Excel.ExcelSheet<Stain>? stainSheet, byte stainId)
         {
-            if (stainId == 0 || stainSheet == null) return 0;
+            if (stainId == 0 || stainSheet == null) return (0u, string.Empty);
             var row = stainSheet.GetRow(stainId);
-            return row.RowId == 0 ? 0u : row.Color;
+            return row.RowId == 0 ? (0u, string.Empty) : (row.Color, row.Name.ExtractText());
         }
     }
 }

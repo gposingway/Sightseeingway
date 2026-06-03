@@ -43,6 +43,17 @@ namespace Sightseeingway.Gear
             return SolidRgba(SwatchSize, SwatchSize, r, g, b);
         }
 
+        /// <summary>An 8×8 fully-transparent swatch (used for an undyed / absent dye channel).</summary>
+        public static byte[] TransparentSwatch()
+            => SolidRgba(SwatchSize, SwatchSize, 0, 0, 0, 0);
+
+        /// <summary>
+        /// A dye swatch: the BGR-corrected colour when dyed, or a transparent swatch
+        /// when the channel has no colour (undyed, or the item has no such dye slot).
+        /// </summary>
+        public static byte[] DyeSwatch(uint seColor)
+            => seColor == 0 ? TransparentSwatch() : StainSwatch(seColor);
+
         /// <summary>An 8×8 RGBA8 swatch of an item's name colour, from its rarity.</summary>
         public static byte[] RaritySwatch(byte rarity)
         {

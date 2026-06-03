@@ -243,13 +243,15 @@ namespace Sightseeingway.Gear
             Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Rarity),
                 Swatch(SwatchFactory.RaritySwatch(slot.Rarity)));
 
-            if (slot.Stain0Color != 0)
-                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye1),
-                    Swatch(SwatchFactory.StainSwatch(slot.Stain0Color)));
+            // Dye channels: always publish both a colour swatch and a name label, so the
+            // per-slot contract is consistent. An undyed / absent channel is transparent.
+            Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye1),
+                Swatch(SwatchFactory.DyeSwatch(slot.Stain0Color)));
+            StageDyeName(built, newNames, slot.Slot, GlamTextureKind.Dye1Name, slot.Stain0Name);
 
-            if (slot.Stain1Color != 0)
-                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye2),
-                    Swatch(SwatchFactory.StainSwatch(slot.Stain1Color)));
+            Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye2),
+                Swatch(SwatchFactory.DyeSwatch(slot.Stain1Color)));
+            StageDyeName(built, newNames, slot.Slot, GlamTextureKind.Dye2Name, slot.Stain1Name);
 
             var ok = 0;
             foreach (var t in built)
@@ -316,6 +318,26 @@ namespace Sightseeingway.Gear
         {
             list.Add(new PushTexture(name, tex));
             names.Add(name);
+        }
+
+        /// <summary>Stages a dye's name as a small white-on-transparent label (Inter), or a
+        /// transparent texture when the channel is undyed.</summary>
+        private static void StageDyeName(List<PushTexture> list, HashSet<string> names, GlamSlot slot,
+            GlamTextureKind kind, string dyeName)
+        {
+            RawTexture tex;
+            if (!string.IsNullOrEmpty(dyeName)
+                && GlamFonts.Get(TextureNaming.NameFontKeys[0]) is { } font
+                && NameTexture.Render(dyeName, font, TextureNaming.NameHeightSmall) is { } rendered)
+            {
+                tex = rendered;
+            }
+            else
+            {
+                tex = Swatch(SwatchFactory.TransparentSwatch());
+            }
+
+            Stage(list, names, TextureNaming.For(slot, kind), tex);
         }
 
         public void Dispose()

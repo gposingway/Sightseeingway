@@ -13,6 +13,8 @@ namespace Sightseeingway.Gear
         Rarity,
         Dye1,
         Dye2,
+        Dye1Name,
+        Dye2Name,
     }
 
     /// <summary>
@@ -43,10 +45,12 @@ namespace Sightseeingway.Gear
 
         public static string Suffix(GlamTextureKind kind) => kind switch
         {
-            GlamTextureKind.Icon   => "ICON",
-            GlamTextureKind.Rarity => "RARITY",
-            GlamTextureKind.Dye1   => "DYE1",
-            GlamTextureKind.Dye2   => "DYE2",
+            GlamTextureKind.Icon     => "ICON",
+            GlamTextureKind.Rarity   => "RARITY",
+            GlamTextureKind.Dye1     => "DYE1",
+            GlamTextureKind.Dye2     => "DYE2",
+            GlamTextureKind.Dye1Name => "DYE1NAME",
+            GlamTextureKind.Dye2Name => "DYE2NAME",
             _ => "UNKNOWN",
         };
 
@@ -65,6 +69,8 @@ namespace Sightseeingway.Gear
             yield return For(slot, GlamTextureKind.Rarity);
             yield return For(slot, GlamTextureKind.Dye1);
             yield return For(slot, GlamTextureKind.Dye2);
+            yield return For(slot, GlamTextureKind.Dye1Name);
+            yield return For(slot, GlamTextureKind.Dye2Name);
             for (var i = 0; i < NameFontKeys.Length; i++)
             {
                 yield return Name(slot, i, false);

@@ -31,6 +31,7 @@ namespace Sightseeingway.Tests
         [InlineData("RINGR", GlamTextureKind.Rarity, "GLAM_RINGR_RARITY")]
         [InlineData("MAINHAND", GlamTextureKind.Dye1, "GLAM_MAINHAND_DYE1")]
         [InlineData("OFFHAND", GlamTextureKind.Dye2, "GLAM_OFFHAND_DYE2")]
+        [InlineData("HEAD", GlamTextureKind.Dye1Name, "GLAM_HEAD_DYE1NAME")]
         public void TextureNaming_BuildsExpectedSemantic(string key, GlamTextureKind kind, string expected)
         {
             var slot = new GlamSlot(0, key);
@@ -51,10 +52,11 @@ namespace Sightseeingway.Tests
             var slot = new GlamSlot(2, "HEAD");
             var all = TextureNaming.AllFor(slot).ToList();
 
-            // 4 base (icon, rarity, dye1, dye2) + 4 fonts × 2 heights = 12, all unique.
-            Assert.Equal(12, all.Count);
-            Assert.Equal(12, all.Distinct().Count());
+            // 6 base (icon, rarity, dye1/2, dye1name/2name) + 4 fonts × 2 heights = 14, all unique.
+            Assert.Equal(14, all.Count);
+            Assert.Equal(14, all.Distinct().Count());
             Assert.Contains("GLAM_HEAD_ICON", all);
+            Assert.Contains("GLAM_HEAD_DYE1NAME", all);
             Assert.Contains("GLAM_HEAD_NAME0", all);
             Assert.Contains("GLAM_HEAD_NAME3L", all);
         }
@@ -117,6 +119,18 @@ namespace Sightseeingway.Tests
             Assert.Equal(0, buf[1]);     // G
             Assert.Equal(255, buf[2]);   // B
             Assert.Equal(255, buf[3]);   // A
+        }
+
+        [Fact]
+        public void DyeSwatch_TransparentWhenUndyed_OpaqueWhenDyed()
+        {
+            var undyed = SwatchFactory.DyeSwatch(0);
+            Assert.Equal(SwatchFactory.SwatchSize * SwatchFactory.SwatchSize * 4, undyed.Length);
+            Assert.All(undyed, b => Assert.Equal(0, b)); // fully transparent, alpha included
+
+            var dyed = SwatchFactory.DyeSwatch(0x0000FF); // blue
+            Assert.Equal(255, dyed[2]);  // B
+            Assert.Equal(255, dyed[3]);  // opaque
         }
 
         [Fact]

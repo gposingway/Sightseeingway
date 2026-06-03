@@ -73,7 +73,8 @@ namespace Sightseeingway.UI.Components
                 ImGui.BulletText("GLAM_<slot>_NAME0..3L — same, @128px (large)");
                 ImGui.TextDisabled("    fonts: 0 Inter · 1 Cinzel · 2 EB Garamond · 3 Cormorant");
                 ImGui.BulletText("GLAM_<slot>_RARITY — name colour swatch (8x8)");
-                ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye channel colours (8x8)");
+                ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye colours (8x8; transparent if undyed)");
+                ImGui.BulletText("GLAM_<slot>_DYE1NAME / _DYE2NAME — dye names (white-on-transparent)");
                 ImGui.TextDisabled("Each also auto-reports its size via the shadingway metric uniform.");
             }
 
