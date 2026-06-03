@@ -75,7 +75,7 @@ namespace Sightseeingway.UI.Components
                 ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye colours (8x8; transparent if undyed)");
                 ImGui.BulletText("GLAM_<slot>_DYE1NAME / _DYE2NAME — dye names (white-on-transparent)");
                 ImGui.BulletText("GLAM_<slot>_CATEGORY — item category, e.g. \"Legs\" (white-on-transparent)");
-                ImGui.BulletText("GLAM_<slot>_TAGS — \"Unique · Untradable\" (transparent if neither)");
+                ImGui.BulletText("GLAM_<slot>_TAGS — \"Unique\" (transparent if not unique)");
                 ImGui.BulletText("GLAM_<slot>_LEVELS — \"Lv. 90 · Ilvl 730\" (white-on-transparent)");
                 ImGui.TextDisabled("Each also auto-reports its size via the shadingway metric uniform.");
             }
