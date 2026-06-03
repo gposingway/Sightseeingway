@@ -9,9 +9,10 @@ using SixLabors.ImageSharp.Processing;
 namespace Sightseeingway.Gear
 {
     /// <summary>
-    /// Renders an item name to a single-channel (r8) coverage texture: white text
-    /// on a transparent field, so a shader can tint it (e.g. with the rarity swatch)
-    /// and the preset controls the colour. Pure-managed via ImageSharp + Fonts.
+    /// Renders an item name to a white-on-transparent RGBA8 texture: RGB is white
+    /// everywhere and alpha is the glyph coverage, so a shader is free to show it
+    /// as-is, tint it (e.g. with the rarity swatch), or invert it — the preset
+    /// decides. Pure-managed via ImageSharp + Fonts.
     /// </summary>
     public static class NameTexture
     {
@@ -34,9 +35,21 @@ namespace Sightseeingway.Gear
                 using var img = new Image<L8>(Width, Height); // all-zero = empty coverage
                 img.Mutate(ctx => ctx.DrawText(text, font, Color.White, new PointF(2f, 4f)));
 
-                var bytes = new byte[Width * Height]; // L8 = 1 byte/pixel = r8
-                img.CopyPixelDataTo(bytes);
-                return new RawTexture("r8", Width, Height, bytes);
+                var coverage = new byte[Width * Height]; // L8 = 1 byte/pixel = glyph coverage
+                img.CopyPixelDataTo(coverage);
+
+                // Expand to white-on-transparent RGBA8: RGB white everywhere, alpha = coverage.
+                var rgba = new byte[Width * Height * 4];
+                for (var i = 0; i < coverage.Length; i++)
+                {
+                    var o = i * 4;
+                    rgba[o] = 255;
+                    rgba[o + 1] = 255;
+                    rgba[o + 2] = 255;
+                    rgba[o + 3] = coverage[i];
+                }
+
+                return new RawTexture("rgba8", Width, Height, rgba);
             }
             catch (Exception ex)
             {

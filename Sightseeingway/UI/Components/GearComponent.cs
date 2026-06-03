@@ -69,7 +69,7 @@ namespace Sightseeingway.UI.Components
             if (ImGui.CollapsingHeader("Published texture names (per slot)"))
             {
                 ImGui.BulletText("GLAM_<slot>_ICON  — item icon, native resolution");
-                ImGui.BulletText("GLAM_<slot>_NAME  — item name (r8 coverage, tint in-shader)");
+                ImGui.BulletText("GLAM_<slot>_NAME  — item name (rgba8, white on transparent)");
                 ImGui.BulletText("GLAM_<slot>_RARITY — name colour swatch (8x8)");
                 ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye channel colours (8x8)");
                 ImGui.TextDisabled("Each also auto-reports its size via the shadingway metric uniform.");
