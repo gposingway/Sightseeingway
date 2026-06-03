@@ -52,13 +52,13 @@ namespace Sightseeingway.Tests
             var slot = new GlamSlot(2, "HEAD");
             var all = TextureNaming.AllFor(slot).ToList();
 
-            // 6 base (icon, rarity, dye1/2, dye1name/2name) + 4 fonts × 2 heights = 14, all unique.
-            Assert.Equal(14, all.Count);
-            Assert.Equal(14, all.Distinct().Count());
+            // 6 base (icon, rarity, dye1/2, dye1name/2name) + 4 fonts × 1 (large) = 10, all unique.
+            Assert.Equal(10, all.Count);
+            Assert.Equal(10, all.Distinct().Count());
             Assert.Contains("GLAM_HEAD_ICON", all);
             Assert.Contains("GLAM_HEAD_DYE1NAME", all);
-            Assert.Contains("GLAM_HEAD_NAME0", all);
             Assert.Contains("GLAM_HEAD_NAME3L", all);
+            Assert.DoesNotContain("GLAM_HEAD_NAME0", all); // small item-name set dropped (unused)
         }
 
         [Fact]

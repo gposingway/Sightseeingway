@@ -228,13 +228,12 @@ namespace Sightseeingway.Gear
             if (icon != null)
                 Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Icon), icon);
 
-            // Name label in each bundled font (index) at small (28) and large (128) heights.
+            // Name label in each bundled font (index) at the large (128px) height. The
+            // consuming shader supersamples this down, so it's crisp at any size — no
+            // separate 28px item-name set is needed (dye names still use 28px below).
             for (var i = 0; i < TextureNaming.NameFontKeys.Length; i++)
             {
                 if (GlamFonts.Get(TextureNaming.NameFontKeys[i]) is not { } family) continue;
-
-                var small = NameTexture.Render(slot.Name, family, TextureNaming.NameHeightSmall);
-                if (small != null) Stage(built, newNames, TextureNaming.Name(slot.Slot, i, false), small);
 
                 var large = NameTexture.Render(slot.Name, family, TextureNaming.NameHeightLarge);
                 if (large != null) Stage(built, newNames, TextureNaming.Name(slot.Slot, i, true), large);

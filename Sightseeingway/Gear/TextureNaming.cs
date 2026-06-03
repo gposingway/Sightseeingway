@@ -72,10 +72,7 @@ namespace Sightseeingway.Gear
             yield return For(slot, GlamTextureKind.Dye1Name);
             yield return For(slot, GlamTextureKind.Dye2Name);
             for (var i = 0; i < NameFontKeys.Length; i++)
-            {
-                yield return Name(slot, i, false);
-                yield return Name(slot, i, true);
-            }
+                yield return Name(slot, i, true); // large only — the small set is unused
         }
 
         public static bool IsIdentifierSafe(string name)

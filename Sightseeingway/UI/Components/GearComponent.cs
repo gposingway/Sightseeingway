@@ -69,8 +69,7 @@ namespace Sightseeingway.UI.Components
             if (ImGui.CollapsingHeader("Published texture names (per slot)"))
             {
                 ImGui.BulletText("GLAM_<slot>_ICON  — item icon, native resolution");
-                ImGui.BulletText("GLAM_<slot>_NAME0..3  — item name, white-on-transparent @28px");
-                ImGui.BulletText("GLAM_<slot>_NAME0..3L — same, @128px (large)");
+                ImGui.BulletText("GLAM_<slot>_NAME0..3L — item name, white-on-transparent @128px");
                 ImGui.TextDisabled("    fonts: 0 Inter · 1 Cinzel · 2 EB Garamond · 3 Cormorant");
                 ImGui.BulletText("GLAM_<slot>_RARITY — name colour swatch (8x8)");
                 ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye colours (8x8; transparent if undyed)");
