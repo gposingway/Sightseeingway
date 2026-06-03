@@ -147,8 +147,15 @@ namespace Sightseeingway.Gear
         // Only "Unique" carries signal — nearly every item is untradable, so that tag is just noise.
         private static string BuildTags(bool unique) => unique ? "Unique" : string.Empty;
 
-        // "Lv. {equip} · Ilvl {item}" — drops the equip part for items with no level requirement.
+        // "Lv. {equip} · Ilvl {item}" — each part is shown only when it carries signal (> 1).
+        // An equip level of 0/1 (no real requirement) or an item level of 1 (cosmetic/glamour
+        // pieces) is a default that means nothing, so it's suppressed; "" when neither applies.
         private static string BuildLevels(byte equipLevel, uint itemLevel)
-            => equipLevel > 0 ? $"Lv. {equipLevel} · Ilvl {itemLevel}" : $"Ilvl {itemLevel}";
+        {
+            var parts = new List<string>(2);
+            if (equipLevel > 1) parts.Add($"Lv. {equipLevel}");
+            if (itemLevel > 1) parts.Add($"Ilvl {itemLevel}");
+            return string.Join(" · ", parts);
+        }
     }
 }
