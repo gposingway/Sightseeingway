@@ -9,11 +9,11 @@ namespace Sightseeingway.Tests
         // ---- Slot registry ----
 
         [Fact]
-        public void Slots_AreTwelveVisibleSlots_WithUniqueKeysAndIndices()
+        public void Slots_AreFourteenVisibleSlots_WithUniqueKeysAndIndices()
         {
-            Assert.Equal(12, GlamSlots.All.Count);
-            Assert.Equal(12, GlamSlots.All.Select(s => s.Key).Distinct().Count());
-            Assert.Equal(12, GlamSlots.All.Select(s => s.EquipIndex).Distinct().Count());
+            Assert.Equal(14, GlamSlots.All.Count);
+            Assert.Equal(14, GlamSlots.All.Select(s => s.Key).Distinct().Count());
+            Assert.Equal(14, GlamSlots.All.Select(s => s.EquipIndex).Distinct().Count());
         }
 
         [Fact]
@@ -22,6 +22,16 @@ namespace Sightseeingway.Tests
             var indices = GlamSlots.All.Select(s => s.EquipIndex).ToHashSet();
             Assert.DoesNotContain(5, indices);   // waist (unused)
             Assert.DoesNotContain(13, indices);  // soul crystal (not visible)
+        }
+
+        [Fact]
+        public void Slots_IncludeBonusCosmetics_WithSyntheticIndices()
+        {
+            var byKey = GlamSlots.All.ToDictionary(s => s.Key, s => s.EquipIndex);
+            Assert.Equal(GlamSlots.FacewearIndex, byKey["FACEWEAR"]);
+            Assert.Equal(GlamSlots.FashionIndex, byKey["FASHION"]);
+            // synthetic indices sit outside the EquippedItems container (0–13)
+            Assert.True(GlamSlots.FacewearIndex > 13 && GlamSlots.FashionIndex > 13);
         }
 
         // ---- Texture naming ----

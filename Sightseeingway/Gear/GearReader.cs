@@ -34,6 +34,11 @@ namespace Sightseeingway.Gear
 
                 foreach (var slot in GlamSlots.All)
                 {
+                    // Bonus cosmetics (facewear glasses, fashion accessory) live on the
+                    // character object, not the EquippedItems container — resolved separately.
+                    if (slot.Key == "FACEWEAR") { TryAddBonus(result, slot, chara, BonusKind.Facewear); continue; }
+                    if (slot.Key == "FASHION")  { TryAddBonus(result, slot, chara, BonusKind.Fashion);  continue; }
+
                     if (slot.EquipIndex >= items.Length) continue;
 
                     var inv = items[slot.EquipIndex];
@@ -146,6 +151,53 @@ namespace Sightseeingway.Gear
 
         // Only "Unique" carries signal — nearly every item is untradable, so that tag is just noise.
         private static string BuildTags(bool unique) => unique ? "Unique" : string.Empty;
+
+        private enum BonusKind { Facewear, Fashion }
+
+        // Facewear (Dawntrail glasses) and the active fashion accessory (ornament) are
+        // "bonus" cosmetics: their ids live on the character object and resolve against
+        // their own sheets, not the Item sheet. They carry only an icon + name — no
+        // rarity tier, dyes, or levels — so those fields are left empty/neutral.
+        private static unsafe void TryAddBonus(List<GearSlotData> result, GlamSlot slot,
+            Character* chara, BonusKind kind)
+        {
+            if (chara == null) return;
+
+            uint id, iconId;
+            string name, category;
+
+            if (kind == BonusKind.Facewear)
+            {
+                id = chara->DrawData.GlassesIds[0];
+                if (id == 0) return;
+                var sheet = Plugin.DataManager.GetExcelSheet<Glasses>();
+                if (sheet == null) return;
+                var row = sheet.GetRow(id);
+                if (row.RowId == 0) return;
+                name = row.Name.ExtractText();
+                iconId = (uint)row.Icon;
+                category = "Facewear";
+            }
+            else
+            {
+                id = chara->OrnamentData.OrnamentId;
+                if (id == 0) return;
+                var sheet = Plugin.DataManager.GetExcelSheet<Lumina.Excel.Sheets.Ornament>();
+                if (sheet == null) return;
+                var row = sheet.GetRow(id);
+                if (row.RowId == 0) return;
+                name = row.Singular.ExtractText();
+                iconId = (uint)row.Icon;
+                category = "Fashion Accessory";
+            }
+
+            if (string.IsNullOrEmpty(name)) return;
+
+            result.Add(new GearSlotData(
+                slot, id, iconId, name, 1,
+                0, 0, 0u, 0u, string.Empty, string.Empty,
+                category, string.Empty, string.Empty));
+        }
 
         // "Lv. {equip} · Ilvl {item}" — each part is shown only when it carries signal (> 1).
         // An equip level of 0/1 (no real requirement) or an item level of 1 (cosmetic/glamour
