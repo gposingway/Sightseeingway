@@ -25,7 +25,6 @@ namespace Sightseeingway
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
         [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
         [PluginService] internal static IGameInventory GameInventory { get; private set; } = null!;
-        [PluginService] internal static ITextureReadbackProvider TextureReadback { get; private set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
         [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;

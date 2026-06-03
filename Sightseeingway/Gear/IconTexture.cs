@@ -1,57 +1,53 @@
 using System;
-using System.Threading.Tasks;
 using Dalamud.Interface.Textures;
+using Lumina.Data.Files;
 
 namespace Sightseeingway.Gear
 {
     /// <summary>
-    /// Loads a game item icon and reads it back to CPU pixels. Uses the icon at its
-    /// native size (80×80 vanilla hi-res, or larger if the player has an icon mod —
-    /// the size is taken from the readback, never assumed). Honors Penumbra texture
-    /// substitution via <c>GetFromGameIcon</c>.
+    /// Loads an item icon's pixels straight from the game's .tex file via Lumina —
+    /// synchronous and thread-safe, with no GPU texture-readback (which yields nothing
+    /// off the render path). Returns tightly-packed RGBA8 at the icon's native size.
+    /// Note: this reads the vanilla game asset, so Penumbra icon mods are not reflected.
     /// </summary>
     public static class IconTexture
     {
-        public static async Task<RawTexture?> ReadAsync(uint iconId)
+        public static RawTexture? Read(uint iconId)
         {
             if (iconId == 0) return null;
 
             try
             {
-                // GameIconLookup defaults to hi-res; this is the verified Glamourer path.
-                var shared = Plugin.TextureProvider.GetFromGameIcon(new GameIconLookup(iconId));
-                using var wrap = await shared.RentAsync();
+                if (!Plugin.TextureProvider.TryGetIconPath(new GameIconLookup(iconId), out var path)
+                    || string.IsNullOrEmpty(path))
+                    return null;
 
-                var (spec, bytes) = await Plugin.TextureReadback.GetRawImageAsync(wrap);
-                var tight = Pack(bytes, spec.Width, spec.Height);
-                Plugin.Logger?.Debug($"Icon {iconId} read: {spec.Width}x{spec.Height}, {tight.Length}B");
-                return new RawTexture("rgba8", spec.Width, spec.Height, tight);
+                var tex = Plugin.DataManager.GetFile<TexFile>(path);
+                if (tex == null) return null;
+
+                int w = tex.Header.Width;
+                int h = tex.Header.Height;
+                var bgra = tex.ImageData; // Lumina decodes every tex format to B8G8R8A8
+                if (w <= 0 || h <= 0 || bgra.Length < w * h * 4) return null;
+
+                // BGRA → RGBA (Shadingway expects rgba8; the swatches confirm RGBA byte order).
+                var rgba = new byte[w * h * 4];
+                for (var i = 0; i < rgba.Length; i += 4)
+                {
+                    rgba[i]     = bgra[i + 2];
+                    rgba[i + 1] = bgra[i + 1];
+                    rgba[i + 2] = bgra[i];
+                    rgba[i + 3] = bgra[i + 3];
+                }
+
+                Plugin.Logger?.Debug($"Icon {iconId} ({path}): {w}x{h}, {rgba.Length}B");
+                return new RawTexture("rgba8", w, h, rgba);
             }
             catch (Exception ex)
             {
-                Plugin.Logger?.Debug($"Icon readback failed for icon {iconId}: {ex.Message}");
+                Plugin.Logger?.Debug($"Icon {iconId} read failed: {ex.Message}");
                 return null;
             }
-        }
-
-        /// <summary>
-        /// Strips any per-row padding so the payload is tightly packed
-        /// width*height*4 (what Shadingway requires). Channel order is taken as-is
-        /// from the readback per the Shadingway producer guide; if an in-game test
-        /// shows red/blue swapped, this is the single place to add the swap.
-        /// </summary>
-        private static byte[] Pack(byte[] src, int width, int height)
-        {
-            if (height <= 0 || width <= 0) return src;
-
-            var tight = width * 4;
-            var stride = src.Length / height;
-            if (stride == tight) return src;
-
-            var dst = new byte[tight * height];
-            for (var y = 0; y < height; y++)
-                Array.Copy(src, y * stride, dst, y * tight, tight);
-            return dst;
         }
     }
 }

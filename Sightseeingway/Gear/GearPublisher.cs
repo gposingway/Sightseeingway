@@ -228,10 +228,9 @@ namespace Sightseeingway.Gear
             var built = new List<PushTexture>();
             var newNames = new HashSet<string>();
 
-            // The texture provider's icon load + GPU readback must be initiated on the
-            // framework thread (the worker thread silently yields no pixels), so hop there
-            // for just this step. Everything else here is plain CPU work.
-            var icon = await Plugin.Framework.RunOnTick(() => IconTexture.ReadAsync(slot.IconId), cancellationToken: ct);
+            // Icon pixels come straight from the game file via Lumina (synchronous, no GPU
+            // readback), so this is safe on the worker thread like the rest of the build.
+            var icon = IconTexture.Read(slot.IconId);
             if (icon != null)
                 Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Icon), icon);
 
