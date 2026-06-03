@@ -24,6 +24,7 @@ namespace Sightseeingway.Gear
 
                 var (spec, bytes) = await Plugin.TextureReadback.GetRawImageAsync(wrap);
                 var tight = Pack(bytes, spec.Width, spec.Height);
+                Plugin.Logger?.Debug($"Icon {iconId} read: {spec.Width}x{spec.Height}, {tight.Length}B");
                 return new RawTexture("rgba8", spec.Width, spec.Height, tight);
             }
             catch (Exception ex)
