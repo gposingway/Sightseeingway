@@ -15,9 +15,6 @@ namespace Sightseeingway.Gear
     /// </summary>
     public static class GearReader
     {
-        // Dedupe for the dye-source diagnostic (framework-thread only).
-        private static readonly HashSet<string> LoggedDyeMismatch = new();
-
         public static unsafe IReadOnlyList<GearSlotData> ReadVisibleGear()
         {
             var result = new List<GearSlotData>(GlamSlots.All.Count);
@@ -52,20 +49,10 @@ namespace Sightseeingway.Gear
                     var row = itemSheet.GetRow(visibleId);
                     if (row.RowId == 0) continue;
 
-                    // Rendered (visible) dyes from the draw data.
+                    // Rendered (visible) dyes from the draw data — the game's already-collapsed
+                    // result: glamour/plate colour when glamoured, raw colour when not.
                     byte stain0 = 0, stain1 = 0;
                     if (chara != null) (stain0, stain1) = ReadDrawStains(chara, slot.Key);
-
-                    // Diagnostic: surface when the rendered dye differs from the item's own
-                    // Stains (the glamour-dye case this read is meant to fix).
-                    var invStains = inv.Stains;
-                    byte invS0 = invStains.Length > 0 ? invStains[0] : (byte)0;
-                    byte invS1 = invStains.Length > 1 ? invStains[1] : (byte)0;
-                    if (stain0 != invS0 || stain1 != invS1)
-                    {
-                        var msg = $"Dye [{slot.Key}]: draw=({stain0},{stain1}) inv=({invS0},{invS1})";
-                        if (LoggedDyeMismatch.Add(msg)) Plugin.Logger?.Debug(msg);
-                    }
 
                     var name = row.Name.ExtractText();
 
