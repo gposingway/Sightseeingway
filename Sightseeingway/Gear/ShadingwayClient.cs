@@ -23,6 +23,9 @@ namespace Sightseeingway.Gear
         public bool LastDiscoveryOk { get; private set; }
         public int? DiscoveredPort => _cachedPort;
 
+        /// <summary>PID reported by the last successful /hello — changes if Shadingway restarts.</summary>
+        public int? DiscoveredPid { get; private set; }
+
         private sealed class HelloResponse
         {
             [JsonProperty("pid")] public int Pid { get; set; }
@@ -59,6 +62,7 @@ namespace Sightseeingway.Gear
 
                     _cachedPort = hello.Port != 0 ? hello.Port : port;
                     _api = string.IsNullOrEmpty(hello.Api) ? "/api/v1" : hello.Api!;
+                    DiscoveredPid = hello.Pid;
                     LastDiscoveryOk = true;
                     return $"http://127.0.0.1:{_cachedPort}{_api}";
                 }
@@ -72,6 +76,7 @@ namespace Sightseeingway.Gear
             }
 
             _cachedPort = null;
+            DiscoveredPid = null;
             LastDiscoveryOk = false;
             return null;
         }

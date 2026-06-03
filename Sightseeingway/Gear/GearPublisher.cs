@@ -9,28 +9,39 @@ using Dalamud.Plugin.Services;
 namespace Sightseeingway.Gear
 {
     /// <summary>
-    /// Watches the player's visible gear and publishes it to Shadingway as a set of
-    /// per-slot primitive textures (icon, name-coverage, rarity + dye swatches).
+    /// Watches the player's visible gear and keeps Shadingway in sync with a minimum
+    /// of work:
     ///
-    /// Cadence: a throttled framework-thread poll reads gear and computes a change
-    /// signature; on change (after a short debounce) the build + HTTP push runs on a
-    /// worker thread. Content is resident on the bus until overwritten or cleared,
-    /// so there is no per-frame cost.
+    /// - <b>On connect</b> (first discovery, or Shadingway restarts — detected by a
+    ///   changed pid) it pushes the full current set, because the bus is empty.
+    /// - <b>On change</b> it pushes only the slot(s) that actually changed, and
+    ///   deletes slots that emptied — unchanged slots are never re-sent.
+    /// - A slow heartbeat re-checks the connection so a Shadingway that starts (or
+    ///   restarts) after the plugin gets the full set without a gear change.
+    ///
+    /// The framework-thread poll only reads gear + computes a change signature; all
+    /// building and HTTP runs on a worker, serialized behind a gate.
     /// </summary>
     public sealed class GearPublisher : IDisposable
     {
-        private static readonly TimeSpan PollInterval = TimeSpan.FromMilliseconds(750);
+        private const long PollIntervalMs = 750;
+        private const long SyncIntervalMs = 5000; // periodic connect/retry, independent of gear changes
         private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(500);
+
+        private static readonly GlamTextureKind[] AllKinds =
+        {
+            GlamTextureKind.Icon, GlamTextureKind.Name, GlamTextureKind.Rarity,
+            GlamTextureKind.Dye1, GlamTextureKind.Dye2,
+        };
 
         private readonly HttpClient _http;
         private readonly ShadingwayClient _client;
         private readonly CancellationTokenSource _cts = new();
-
-        // Serializes all bus mutations (publish vs flush) so _pushedNames has a single writer.
         private readonly SemaphoreSlim _gate = new(1, 1);
 
         // Framework-thread-only state (OnUpdate runs solely on the framework thread).
         private long _lastPollTicks;
+        private long _lastSyncTicks;
         private string _lastSignature = "";
         private DateTime _lastChangeUtc = DateTime.MinValue;
         private bool _dirty;
@@ -41,7 +52,11 @@ namespace Sightseeingway.Gear
         private volatile bool _probing;
         private volatile int _pushedCount;
         private volatile string _statusLine = "Idle";
-        private readonly HashSet<string> _pushedNames = new(); // touched only while holding _gate
+
+        // Worker-owned state — touched only while holding _gate.
+        private readonly Dictionary<string, string> _publishedSlots = new(); // slot key → published signature
+        private readonly HashSet<string> _publishedNames = new();            // resident texture names on the bus
+        private int? _connectedPid;                                          // pid we last synced with
 
         public string StatusLine => _statusLine;
         public bool ShadingwayDetected => _client.LastDiscoveryOk;
@@ -76,18 +91,21 @@ namespace Sightseeingway.Gear
         private void OnUpdate(IFramework framework)
         {
             var enabled = Plugin.Config.GearPublishEnabled;
-            // Rising edge (re-enabled): force the next poll to treat gear as changed so
-            // we re-publish even if nothing about the outfit moved while disabled.
-            if (enabled && !_wasEnabled) _lastSignature = "\0reenabled";
+            // Rising edge (re-enabled): force the next cycle to treat gear as changed and
+            // to re-sync the connection immediately.
+            if (enabled && !_wasEnabled)
+            {
+                _lastSignature = "\0reenabled";
+                _lastSyncTicks = 0;
+            }
             _wasEnabled = enabled;
 
             if (!enabled || _publishing) return;
 
             var now = Environment.TickCount64;
-            if (now - _lastPollTicks < PollInterval.TotalMilliseconds) return;
+            if (now - _lastPollTicks < PollIntervalMs) return;
             _lastPollTicks = now;
 
-            // Framework thread: read gear + compute the change signature.
             IReadOnlyList<GearSlotData> slots;
             try
             {
@@ -107,32 +125,28 @@ namespace Sightseeingway.Gear
                 _dirty = true;
             }
 
-            if (_dirty && DateTime.UtcNow - _lastChangeUtc >= Debounce)
+            var gearReady = _dirty && DateTime.UtcNow - _lastChangeUtc >= Debounce;
+            var syncDue = now - _lastSyncTicks >= SyncIntervalMs;
+            if (!gearReady && !syncDue) return;
+
+            _dirty = false;
+            _lastSyncTicks = now;
+            _publishing = true;
+            var captured = slots; // captured by value on the framework thread
+            _ = Task.Run(async () =>
             {
-                _dirty = false;
-                _publishing = true;
-                var captured = slots; // captured by value on the framework thread
-                _ = Task.Run(async () =>
-                {
-                    try { await PublishAsync(captured, _cts.Token); }
-                    catch (OperationCanceledException) { /* disposing */ }
-                    catch (Exception ex) { Plugin.Logger?.Debug($"Gear publish task failed: {ex.Message}"); }
-                    finally { _publishing = false; }
-                });
-            }
+                try { await PublishAsync(captured, _cts.Token); }
+                catch (OperationCanceledException) { /* disposing */ }
+                catch (Exception ex) { Plugin.Logger?.Debug($"Gear publish task failed: {ex.Message}"); }
+                finally { _publishing = false; }
+            });
         }
 
         private async Task PublishAsync(IReadOnlyList<GearSlotData> slots, CancellationToken ct)
         {
             await _gate.WaitAsync(ct);
-            try
-            {
-                await PublishLockedAsync(slots, ct);
-            }
-            finally
-            {
-                _gate.Release();
-            }
+            try { await PublishLockedAsync(slots, ct); }
+            finally { _gate.Release(); }
         }
 
         private async Task PublishLockedAsync(IReadOnlyList<GearSlotData> slots, CancellationToken ct)
@@ -140,70 +154,128 @@ namespace Sightseeingway.Gear
             var baseUrl = await _client.DiscoverAsync(Plugin.Config.GearShadingwayPort, ct);
             if (baseUrl == null)
             {
+                // Disconnected: leave our published-state intact. If Shadingway comes back
+                // as the same pid its bus still holds our textures (delta resumes); a new
+                // pid is treated as a reconnect and re-sends everything.
                 _statusLine = "Shadingway not found";
                 return;
             }
 
-            var current = new HashSet<string>();
-            var toPush = new List<PushTexture>();
+            var pid = _client.DiscoveredPid;
+            var reconnect = pid != _connectedPid;
+            _connectedPid = pid;
 
-            foreach (var slot in slots)
+            var current = new Dictionary<string, GearSlotData>(slots.Count);
+            foreach (var s in slots) current[s.Slot.Key] = s;
+
+            // Slots to (re)push: everything on reconnect, otherwise only new/changed signatures.
+            var toPush = new List<GearSlotData>();
+            foreach (var s in slots)
             {
-                var icon = await IconTexture.ReadAsync(slot.IconId);
-                if (icon != null)
-                    Stage(toPush, current, TextureNaming.For(slot.Slot, GlamTextureKind.Icon), icon);
-
-                var name = NameTexture.Render(slot.Name);
-                if (name != null)
-                    Stage(toPush, current, TextureNaming.For(slot.Slot, GlamTextureKind.Name), name);
-
-                Stage(toPush, current, TextureNaming.For(slot.Slot, GlamTextureKind.Rarity),
-                    Swatch(SwatchFactory.RaritySwatch(slot.Rarity)));
-
-                if (slot.Stain0Color != 0)
-                    Stage(toPush, current, TextureNaming.For(slot.Slot, GlamTextureKind.Dye1),
-                        Swatch(SwatchFactory.StainSwatch(slot.Stain0Color)));
-
-                if (slot.Stain1Color != 0)
-                    Stage(toPush, current, TextureNaming.For(slot.Slot, GlamTextureKind.Dye2),
-                        Swatch(SwatchFactory.StainSwatch(slot.Stain1Color)));
+                if (reconnect
+                    || !_publishedSlots.TryGetValue(s.Slot.Key, out var prev)
+                    || prev != s.Signature())
+                {
+                    toPush.Add(s);
+                }
             }
 
-            var ok = 0;
-            foreach (var t in toPush)
-                if (await _client.PostTextureAsync(baseUrl, t, ct)) ok++;
+            // Slots that were published but are no longer present → delete.
+            var toRemove = _publishedSlots.Keys.Where(k => !current.ContainsKey(k)).ToList();
 
-            // Clear any names we previously pushed for slots/dyes that are now gone.
-            foreach (var stale in _pushedNames.Where(n => !current.Contains(n)).ToList())
-                await _client.DeleteTextureAsync(baseUrl, stale, ct);
+            if (toPush.Count == 0 && toRemove.Count == 0)
+            {
+                _pushedCount = _publishedNames.Count;
+                _statusLine = reconnect ? $"In sync (pid {pid})" : "Up to date";
+                return;
+            }
 
-            _pushedNames.Clear();
-            foreach (var n in current) _pushedNames.Add(n);
-            _pushedCount = _pushedNames.Count;
+            foreach (var s in toPush) await PublishSlotAsync(baseUrl, s, ct);
+            foreach (var key in toRemove) await RemoveSlotAsync(baseUrl, key, ct);
 
-            _statusLine = $"Pushed {ok}/{toPush.Count} textures · {slots.Count} slots";
+            _pushedCount = _publishedNames.Count;
+            _statusLine = reconnect
+                ? $"Connected — sent {toPush.Count} slot(s)"
+                : $"Updated {toPush.Count} changed, {toRemove.Count} removed";
+        }
+
+        /// <summary>Builds and pushes one slot's textures, clearing any of its now-stale names.</summary>
+        private async Task PublishSlotAsync(string baseUrl, GearSlotData slot, CancellationToken ct)
+        {
+            var built = new List<PushTexture>();
+            var newNames = new HashSet<string>();
+
+            var icon = await IconTexture.ReadAsync(slot.IconId);
+            if (icon != null)
+                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Icon), icon);
+
+            var name = NameTexture.Render(slot.Name);
+            if (name != null)
+                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Name), name);
+
+            Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Rarity),
+                Swatch(SwatchFactory.RaritySwatch(slot.Rarity)));
+
+            if (slot.Stain0Color != 0)
+                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye1),
+                    Swatch(SwatchFactory.StainSwatch(slot.Stain0Color)));
+
+            if (slot.Stain1Color != 0)
+                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye2),
+                    Swatch(SwatchFactory.StainSwatch(slot.Stain1Color)));
+
+            foreach (var t in built) await _client.PostTextureAsync(baseUrl, t, ct);
+
+            // Delete any of this slot's names that are no longer present (e.g. a removed dye),
+            // then make _publishedNames reflect exactly this slot's current set.
+            foreach (var kind in AllKinds)
+            {
+                var n = TextureNaming.For(slot.Slot, kind);
+                if (!newNames.Contains(n) && _publishedNames.Contains(n))
+                    await _client.DeleteTextureAsync(baseUrl, n, ct);
+                _publishedNames.Remove(n);
+            }
+            foreach (var n in newNames) _publishedNames.Add(n);
+
+            _publishedSlots[slot.Slot.Key] = slot.Signature();
+        }
+
+        /// <summary>Deletes everything for a slot that is no longer worn.</summary>
+        private async Task RemoveSlotAsync(string baseUrl, string slotKey, CancellationToken ct)
+        {
+            foreach (var s in GlamSlots.All)
+            {
+                if (s.Key != slotKey) continue;
+                foreach (var kind in AllKinds)
+                {
+                    var n = TextureNaming.For(s, kind);
+                    if (_publishedNames.Remove(n))
+                        await _client.DeleteTextureAsync(baseUrl, n, ct);
+                }
+                break;
+            }
+            _publishedSlots.Remove(slotKey);
         }
 
         /// <summary>Removes everything this publisher owns from the bus (disable/logout).</summary>
         public async Task FlushAsync()
         {
-            try
-            {
-                await _gate.WaitAsync(_cts.Token);
-            }
+            try { await _gate.WaitAsync(_cts.Token); }
             catch (Exception) { return; } // disposed/cancelled — nothing to flush
 
             try
             {
                 var baseUrl = await _client.DiscoverAsync(Plugin.Config.GearShadingwayPort, _cts.Token);
                 if (baseUrl != null)
-                    foreach (var n in _pushedNames.ToList())
+                    foreach (var n in _publishedNames.ToList())
                         await _client.DeleteTextureAsync(baseUrl, n, _cts.Token);
             }
             catch (Exception ex) { Plugin.Logger?.Debug($"Gear flush failed: {ex.Message}"); }
             finally
             {
-                _pushedNames.Clear();
+                _publishedNames.Clear();
+                _publishedSlots.Clear();
+                _connectedPid = null;
                 _pushedCount = 0;
                 _statusLine = "Cleared";
                 _gate.Release();
