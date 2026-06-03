@@ -59,6 +59,11 @@ namespace Sightseeingway.Gear
                     var (color0, dyeName0) = ResolveStain(stainSheet, stain0);
                     var (color1, dyeName1) = ResolveStain(stainSheet, stain1);
 
+                    // Informational labels (from the visible item, like its name/icon).
+                    var category = row.ItemUICategory.ValueNullable?.Name.ExtractText() ?? string.Empty;
+                    var tags = BuildTags(row.IsUnique, row.IsUntradable);
+                    var levels = BuildLevels(row.LevelEquip, row.LevelItem.RowId);
+
                     result.Add(new GearSlotData(
                         slot,
                         visibleId,
@@ -70,7 +75,10 @@ namespace Sightseeingway.Gear
                         color0,
                         color1,
                         dyeName0,
-                        dyeName1));
+                        dyeName1,
+                        category,
+                        tags,
+                        levels));
                 }
 
                 if (result.Count == 0 && items.Length > 0)
@@ -135,5 +143,18 @@ namespace Sightseeingway.Gear
             var row = stainSheet.GetRow(stainId);
             return row.RowId == 0 ? (0u, string.Empty) : (row.Color, row.Name.ExtractText());
         }
+
+        // "Unique · Untradable" when both apply, a single word when one does, "" when neither.
+        private static string BuildTags(bool unique, bool untradable)
+        {
+            if (unique && untradable) return "Unique · Untradable";
+            if (unique) return "Unique";
+            if (untradable) return "Untradable";
+            return string.Empty;
+        }
+
+        // "Lv. {equip} · Ilvl {item}" — drops the equip part for items with no level requirement.
+        private static string BuildLevels(byte equipLevel, uint itemLevel)
+            => equipLevel > 0 ? $"Lv. {equipLevel} · Ilvl {itemLevel}" : $"Ilvl {itemLevel}";
     }
 }

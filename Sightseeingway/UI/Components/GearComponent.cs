@@ -74,6 +74,9 @@ namespace Sightseeingway.UI.Components
                 ImGui.BulletText("GLAM_<slot>_RARITY — name colour swatch (8x8)");
                 ImGui.BulletText("GLAM_<slot>_DYE1 / _DYE2 — dye colours (8x8; transparent if undyed)");
                 ImGui.BulletText("GLAM_<slot>_DYE1NAME / _DYE2NAME — dye names (white-on-transparent)");
+                ImGui.BulletText("GLAM_<slot>_CATEGORY — item category, e.g. \"Legs\" (white-on-transparent)");
+                ImGui.BulletText("GLAM_<slot>_TAGS — \"Unique · Untradable\" (transparent if neither)");
+                ImGui.BulletText("GLAM_<slot>_LEVELS — \"Lv. 90 · Ilvl 730\" (white-on-transparent)");
                 ImGui.TextDisabled("Each also auto-reports its size via the shadingway metric uniform.");
             }
 
@@ -122,6 +125,10 @@ namespace Sightseeingway.UI.Components
                     ImGui.AlignTextToFramePadding();
                     var (r, g, b) = SwatchFactory.RarityColor(slot.Rarity);
                     ImGui.TextColored(new Vector4(r / 255f, g / 255f, b / 255f, 1f), slot.Name);
+                    var sub = slot.Category;
+                    if (!string.IsNullOrEmpty(slot.Levels)) sub += $"   ·   {slot.Levels}";
+                    if (!string.IsNullOrEmpty(slot.Tags)) sub += $"   ·   {slot.Tags}";
+                    if (!string.IsNullOrEmpty(sub)) ImGui.TextDisabled(sub);
 
                     ImGui.TableNextColumn();
                     DrawDye(slot.Stain0Color);

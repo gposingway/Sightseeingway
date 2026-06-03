@@ -245,11 +245,18 @@ namespace Sightseeingway.Gear
             // per-slot contract is consistent. An undyed / absent channel is transparent.
             Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye1),
                 Swatch(SwatchFactory.DyeSwatch(slot.Stain0Color)));
-            StageDyeName(built, newNames, slot.Slot, GlamTextureKind.Dye1Name, slot.Stain0Name);
+            StageLabel(built, newNames, slot.Slot, GlamTextureKind.Dye1Name, slot.Stain0Name, TextureNaming.DyeNameHeight);
 
             Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Dye2),
                 Swatch(SwatchFactory.DyeSwatch(slot.Stain1Color)));
-            StageDyeName(built, newNames, slot.Slot, GlamTextureKind.Dye2Name, slot.Stain1Name);
+            StageLabel(built, newNames, slot.Slot, GlamTextureKind.Dye2Name, slot.Stain1Name, TextureNaming.DyeNameHeight);
+
+            // Informational labels from the visible item — item category, unique/untradable
+            // tags (empty -> transparent), and the level line. Rendered at the large height
+            // so they stay crisp wherever a shader places them.
+            StageLabel(built, newNames, slot.Slot, GlamTextureKind.Category, slot.Category, TextureNaming.NameHeight);
+            StageLabel(built, newNames, slot.Slot, GlamTextureKind.Tags, slot.Tags, TextureNaming.NameHeight);
+            StageLabel(built, newNames, slot.Slot, GlamTextureKind.Levels, slot.Levels, TextureNaming.NameHeight);
 
             var ok = 0;
             foreach (var t in built)
@@ -318,15 +325,15 @@ namespace Sightseeingway.Gear
             names.Add(name);
         }
 
-        /// <summary>Stages a dye's name as a small white-on-transparent label (Inter), or a
-        /// transparent texture when the channel is undyed.</summary>
-        private static void StageDyeName(List<PushTexture> list, HashSet<string> names, GlamSlot slot,
-            GlamTextureKind kind, string dyeName)
+        /// <summary>Stages a text label as a white-on-transparent texture (Inter, at the given
+        /// pixel height), or a transparent texture when the text is empty.</summary>
+        private static void StageLabel(List<PushTexture> list, HashSet<string> names, GlamSlot slot,
+            GlamTextureKind kind, string text, int heightPx)
         {
             RawTexture tex;
-            if (!string.IsNullOrEmpty(dyeName)
+            if (!string.IsNullOrEmpty(text)
                 && GlamFonts.Get(TextureNaming.NameFontKeys[0]) is { } font
-                && NameTexture.Render(dyeName, font, TextureNaming.DyeNameHeight) is { } rendered)
+                && NameTexture.Render(text, font, heightPx) is { } rendered)
             {
                 tex = rendered;
             }

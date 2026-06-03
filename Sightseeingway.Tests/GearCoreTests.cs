@@ -32,6 +32,9 @@ namespace Sightseeingway.Tests
         [InlineData("MAINHAND", GlamTextureKind.Dye1, "GLAM_MAINHAND_DYE1")]
         [InlineData("OFFHAND", GlamTextureKind.Dye2, "GLAM_OFFHAND_DYE2")]
         [InlineData("HEAD", GlamTextureKind.Dye1Name, "GLAM_HEAD_DYE1NAME")]
+        [InlineData("LEGS", GlamTextureKind.Category, "GLAM_LEGS_CATEGORY")]
+        [InlineData("BODY", GlamTextureKind.Tags, "GLAM_BODY_TAGS")]
+        [InlineData("FEET", GlamTextureKind.Levels, "GLAM_FEET_LEVELS")]
         public void TextureNaming_BuildsExpectedSemantic(string key, GlamTextureKind kind, string expected)
         {
             var slot = new GlamSlot(0, key);
@@ -51,11 +54,15 @@ namespace Sightseeingway.Tests
             var slot = new GlamSlot(2, "HEAD");
             var all = TextureNaming.AllFor(slot).ToList();
 
-            // 6 base (icon, rarity, dye1/2, dye1name/2name) + 4 fonts × 1 (large) = 10, all unique.
-            Assert.Equal(10, all.Count);
-            Assert.Equal(10, all.Distinct().Count());
+            // 9 base (icon, rarity, dye1/2, dye1name/2name, category, tags, levels)
+            // + 4 fonts × 1 = 13, all unique.
+            Assert.Equal(13, all.Count);
+            Assert.Equal(13, all.Distinct().Count());
             Assert.Contains("GLAM_HEAD_ICON", all);
             Assert.Contains("GLAM_HEAD_DYE1NAME", all);
+            Assert.Contains("GLAM_HEAD_CATEGORY", all);
+            Assert.Contains("GLAM_HEAD_TAGS", all);
+            Assert.Contains("GLAM_HEAD_LEVELS", all);
             Assert.Contains("GLAM_HEAD_NAME0", all);
             Assert.Contains("GLAM_HEAD_NAME3", all);
             Assert.DoesNotContain("GLAM_HEAD_NAME0L", all); // no more "L" suffix

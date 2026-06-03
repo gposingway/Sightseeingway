@@ -15,6 +15,9 @@ namespace Sightseeingway.Gear
         Dye2,
         Dye1Name,
         Dye2Name,
+        Category,
+        Tags,
+        Levels,
     }
 
     /// <summary>
@@ -53,6 +56,9 @@ namespace Sightseeingway.Gear
             GlamTextureKind.Dye2     => "DYE2",
             GlamTextureKind.Dye1Name => "DYE1NAME",
             GlamTextureKind.Dye2Name => "DYE2NAME",
+            GlamTextureKind.Category => "CATEGORY",
+            GlamTextureKind.Tags     => "TAGS",
+            GlamTextureKind.Levels   => "LEVELS",
             _ => "UNKNOWN",
         };
 
@@ -72,6 +78,9 @@ namespace Sightseeingway.Gear
             yield return For(slot, GlamTextureKind.Dye2);
             yield return For(slot, GlamTextureKind.Dye1Name);
             yield return For(slot, GlamTextureKind.Dye2Name);
+            yield return For(slot, GlamTextureKind.Category);
+            yield return For(slot, GlamTextureKind.Tags);
+            yield return For(slot, GlamTextureKind.Levels);
             for (var i = 0; i < NameFontKeys.Length; i++)
                 yield return Name(slot, i);
         }

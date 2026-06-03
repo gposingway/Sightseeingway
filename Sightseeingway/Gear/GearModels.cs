@@ -17,11 +17,15 @@ namespace Sightseeingway.Gear
         uint Stain0Color,
         uint Stain1Color,
         string Stain0Name,
-        string Stain1Name)
+        string Stain1Name,
+        string Category,
+        string Tags,
+        string Levels)
     {
         /// <summary>
         /// A compact change key for this slot — what the player is visibly wearing
-        /// and how it's dyed. Two reads with equal signatures need no re-publish.
+        /// and how it's dyed. Category/Tags/Levels derive deterministically from
+        /// <see cref="VisibleItemId"/>, so they need no place in the signature.
         /// </summary>
         public string Signature() => $"{Slot.EquipIndex}:{VisibleItemId}:{Stain0}:{Stain1}";
     }
