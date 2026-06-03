@@ -21,6 +21,7 @@ namespace Sightseeingway.UI.Components
         // thread, so reading live game state here is safe — just not every frame).
         private IReadOnlyList<GearSlotData> _cached = Array.Empty<GearSlotData>();
         private long _lastRefreshTicks;
+        private long _lastProbeTicks;
 
         public bool Render(Configuration tempConfig)
         {
@@ -156,7 +157,7 @@ namespace Sightseeingway.UI.Components
                 ImGuiColorEditFlags.NoTooltip | ImGuiColorEditFlags.NoPicker, box);
         }
 
-        private static void DrawStatus(Configuration tempConfig)
+        private void DrawStatus(Configuration tempConfig)
         {
             var pub = Plugin.GearPublisher;
             if (pub == null)
@@ -165,18 +166,33 @@ namespace Sightseeingway.UI.Components
                 return;
             }
 
-            if (!tempConfig.GearPublishEnabled)
+            // Heartbeat: probe Shadingway while this tab is on screen, regardless of
+            // the enable toggle, so detection always reflects reality.
+            var now = Environment.TickCount64;
+            if (now - _lastProbeTicks > 2500)
             {
-                ImGui.TextDisabled("Disabled — enable above and Save to start publishing.");
-                return;
+                _ = pub.ProbeAsync();
+                _lastProbeTicks = now;
             }
 
             ImGui.TextUnformatted("Shadingway:");
             ImGui.SameLine();
             if (pub.ShadingwayDetected)
-                ImGui.TextColored(OkColor, "detected");
+                ImGui.TextColored(OkColor, pub.DiscoveredPort is { } port ? $"detected on :{port}" : "detected");
             else
                 ImGui.TextColored(WarnColor, "not found (is the addon running?)");
+            ImGui.SameLine();
+            if (ImGui.SmallButton("Re-check"))
+            {
+                _ = pub.ProbeAsync();
+                _lastProbeTicks = now;
+            }
+
+            if (!tempConfig.GearPublishEnabled)
+            {
+                ImGui.TextDisabled("Publishing disabled — enable above and Save to start pushing.");
+                return;
+            }
 
             ImGui.Text($"Textures resident on bus: {pub.PushedCount}");
             ImGui.TextWrapped($"Status: {pub.StatusLine}");

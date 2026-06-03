@@ -38,19 +38,39 @@ namespace Sightseeingway.Gear
 
         // Cross-thread state.
         private volatile bool _publishing;
+        private volatile bool _probing;
         private volatile int _pushedCount;
         private volatile string _statusLine = "Idle";
         private readonly HashSet<string> _pushedNames = new(); // touched only while holding _gate
 
         public string StatusLine => _statusLine;
         public bool ShadingwayDetected => _client.LastDiscoveryOk;
+        public int? DiscoveredPort => _client.DiscoveredPort;
         public int PushedCount => _pushedCount;
 
         public GearPublisher()
         {
-            _http = new HttpClient { Timeout = TimeSpan.FromSeconds(5) };
+            // Bypass any system/WinHTTP proxy — it can hijack or break loopback requests,
+            // which is a common reason a local /hello probe silently fails.
+            _http = new HttpClient(new HttpClientHandler { UseProxy = false })
+            {
+                Timeout = TimeSpan.FromSeconds(5),
+            };
             _client = new ShadingwayClient(_http);
             Plugin.Framework.Update += OnUpdate;
+        }
+
+        /// <summary>
+        /// Checks for Shadingway without publishing (drives the Gear tab's live status).
+        /// Safe to call fire-and-forget; coalesced so overlapping calls are cheap.
+        /// </summary>
+        public async Task ProbeAsync()
+        {
+            if (_probing || _publishing) return;
+            _probing = true;
+            try { await _client.DiscoverAsync(Plugin.Config.GearShadingwayPort, _cts.Token); }
+            catch (Exception ex) { Plugin.Logger?.Debug($"Shadingway probe failed: {ex.Message}"); }
+            finally { _probing = false; }
         }
 
         private void OnUpdate(IFramework framework)

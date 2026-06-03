@@ -64,7 +64,11 @@ namespace Sightseeingway.Gear
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (ObjectDisposedException) { break; } // client disposed mid-scan
-                catch { /* connection refused / timeout → try the next port */ }
+                catch (Exception ex)
+                {
+                    // connection refused / timeout / proxy error → try the next port
+                    Plugin.Logger?.Debug($"/hello probe on :{port} failed: {ex.Message}");
+                }
             }
 
             _cachedPort = null;
