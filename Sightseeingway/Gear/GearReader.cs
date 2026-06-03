@@ -1,18 +1,24 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Game.Inventory;
+using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using Lumina.Excel.Sheets;
 
 namespace Sightseeingway.Gear
 {
     /// <summary>
-    /// Reads the player's currently VISIBLE gear from the EquippedItems container,
-    /// honoring glamour overrides. Must run on the framework thread — it touches
-    /// the live inventory; the returned list is plain data and thread-safe to pass on.
+    /// Reads the player's currently VISIBLE gear. Icon/name/rarity come from the
+    /// equipped item (glamour-aware) via the inventory; the DYES come from the
+    /// rendered <c>Character.DrawData</c>, which reflects what's actually on screen
+    /// (a dye applied to a glamour / glamour-plate isn't on the item's own Stains).
+    /// Must run on the framework thread; the returned list is plain data.
     /// </summary>
     public static class GearReader
     {
-        public static IReadOnlyList<GearSlotData> ReadVisibleGear()
+        // Dedupe for the dye-source diagnostic (framework-thread only).
+        private static readonly HashSet<string> LoggedDyeMismatch = new();
+
+        public static unsafe IReadOnlyList<GearSlotData> ReadVisibleGear()
         {
             var result = new List<GearSlotData>(GlamSlots.All.Count);
 
@@ -25,6 +31,9 @@ namespace Sightseeingway.Gear
                 if (itemSheet == null) return result;
 
                 var stainSheet = Plugin.DataManager.GetExcelSheet<Stain>();
+
+                var player = Plugin.ObjectTable.LocalPlayer;
+                var chara = player != null ? (Character*)player.Address : null;
 
                 foreach (var slot in GlamSlots.All)
                 {
@@ -43,9 +52,20 @@ namespace Sightseeingway.Gear
                     var row = itemSheet.GetRow(visibleId);
                     if (row.RowId == 0) continue;
 
-                    var stains = inv.Stains;
-                    byte stain0 = stains.Length > 0 ? stains[0] : (byte)0;
-                    byte stain1 = stains.Length > 1 ? stains[1] : (byte)0;
+                    // Rendered (visible) dyes from the draw data.
+                    byte stain0 = 0, stain1 = 0;
+                    if (chara != null) (stain0, stain1) = ReadDrawStains(chara, slot.Key);
+
+                    // Diagnostic: surface when the rendered dye differs from the item's own
+                    // Stains (the glamour-dye case this read is meant to fix).
+                    var invStains = inv.Stains;
+                    byte invS0 = invStains.Length > 0 ? invStains[0] : (byte)0;
+                    byte invS1 = invStains.Length > 1 ? invStains[1] : (byte)0;
+                    if (stain0 != invS0 || stain1 != invS1)
+                    {
+                        var msg = $"Dye [{slot.Key}]: draw=({stain0},{stain1}) inv=({invS0},{invS1})";
+                        if (LoggedDyeMismatch.Add(msg)) Plugin.Logger?.Debug(msg);
+                    }
 
                     var name = row.Name.ExtractText();
 
@@ -66,8 +86,6 @@ namespace Sightseeingway.Gear
                         dyeName1));
                 }
 
-                // Diagnostic: equipped items present but nothing resolved usually means an
-                // id-offset / sheet-lookup issue worth seeing under /sway debug.
                 if (result.Count == 0 && items.Length > 0)
                     Plugin.Logger?.Debug($"Gear read: {items.Length} equipped items, 0 resolved.");
             }
@@ -77,6 +95,49 @@ namespace Sightseeingway.Gear
             }
 
             return result;
+        }
+
+        /// <summary>Reads the two rendered dye-channel ids for a slot from the draw data.</summary>
+        private static unsafe (byte, byte) ReadDrawStains(Character* chara, string slotKey)
+        {
+            switch (slotKey)
+            {
+                case "MAINHAND":
+                {
+                    var m = chara->DrawData.Weapon(DrawDataContainer.WeaponSlot.MainHand).ModelId;
+                    return (m.Stain0, m.Stain1);
+                }
+                case "OFFHAND":
+                {
+                    var o = chara->DrawData.Weapon(DrawDataContainer.WeaponSlot.OffHand).ModelId;
+                    return (o.Stain0, o.Stain1);
+                }
+                default:
+                {
+                    if (!TryEquipSlot(slotKey, out var es)) return (0, 0);
+                    var e = chara->DrawData.Equipment(es);
+                    return (e.Stain0, e.Stain1);
+                }
+            }
+        }
+
+        private static bool TryEquipSlot(string key, out DrawDataContainer.EquipmentSlot slot)
+        {
+            slot = key switch
+            {
+                "HEAD"   => DrawDataContainer.EquipmentSlot.Head,
+                "BODY"   => DrawDataContainer.EquipmentSlot.Body,
+                "HANDS"  => DrawDataContainer.EquipmentSlot.Hands,
+                "LEGS"   => DrawDataContainer.EquipmentSlot.Legs,
+                "FEET"   => DrawDataContainer.EquipmentSlot.Feet,
+                "EARS"   => DrawDataContainer.EquipmentSlot.Ears,
+                "NECK"   => DrawDataContainer.EquipmentSlot.Neck,
+                "WRISTS" => DrawDataContainer.EquipmentSlot.Wrists,
+                "RINGR"  => DrawDataContainer.EquipmentSlot.RFinger,
+                "RINGL"  => DrawDataContainer.EquipmentSlot.LFinger,
+                _        => (DrawDataContainer.EquipmentSlot)0xFF,
+            };
+            return (byte)slot <= 9;
         }
 
         // Resolved here (on the framework thread) so the publish worker never touches sheets.
