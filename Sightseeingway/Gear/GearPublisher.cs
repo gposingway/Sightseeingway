@@ -228,15 +228,14 @@ namespace Sightseeingway.Gear
             if (icon != null)
                 Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Icon), icon);
 
-            // Name label in each bundled font (index) at the large (128px) height. The
-            // consuming shader supersamples this down, so it's crisp at any size — no
-            // separate 28px item-name set is needed (dye names still use 28px below).
+            // Name label in each bundled font (index). Rendered at 128px; the consuming
+            // shader supersamples it down, so it's crisp at any display size.
             for (var i = 0; i < TextureNaming.NameFontKeys.Length; i++)
             {
                 if (GlamFonts.Get(TextureNaming.NameFontKeys[i]) is not { } family) continue;
 
-                var large = NameTexture.Render(slot.Name, family, TextureNaming.NameHeightLarge);
-                if (large != null) Stage(built, newNames, TextureNaming.Name(slot.Slot, i, true), large);
+                var label = NameTexture.Render(slot.Name, family, TextureNaming.NameHeight);
+                if (label != null) Stage(built, newNames, TextureNaming.Name(slot.Slot, i), label);
             }
 
             Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Rarity),
@@ -327,7 +326,7 @@ namespace Sightseeingway.Gear
             RawTexture tex;
             if (!string.IsNullOrEmpty(dyeName)
                 && GlamFonts.Get(TextureNaming.NameFontKeys[0]) is { } font
-                && NameTexture.Render(dyeName, font, TextureNaming.NameHeightSmall) is { } rendered)
+                && NameTexture.Render(dyeName, font, TextureNaming.DyeNameHeight) is { } rendered)
             {
                 tex = rendered;
             }

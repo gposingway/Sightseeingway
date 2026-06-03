@@ -32,9 +32,11 @@ namespace Sightseeingway.Gear
         /// </summary>
         public static readonly string[] NameFontKeys = { "INTER", "CINZEL", "GARAMOND", "CORMORANT" };
 
-        /// <summary>The two texture heights (px): small (no suffix) and large ("L").</summary>
-        public const int NameHeightSmall = 28;
-        public const int NameHeightLarge = 128;
+        /// <summary>Render height (px) for item-name labels (supersampled by the shader).</summary>
+        public const int NameHeight = 128;
+
+        /// <summary>Render height (px) for the smaller dye-name labels.</summary>
+        public const int DyeNameHeight = 28;
 
         // Shadingway requires identifier-safe names: [A-Za-z_][A-Za-z0-9_]*, <= 64 chars.
         private static readonly Regex IdentifierPattern =
@@ -55,12 +57,11 @@ namespace Sightseeingway.Gear
         };
 
         /// <summary>
-        /// A name-label variant: <c>GLAM_&lt;SLOT&gt;_NAME&lt;index&gt;</c> (small) or
-        /// <c>…NAME&lt;index&gt;L</c> (large). The index selects the font (see
-        /// <see cref="NameFontKeys"/>).
+        /// A name-label texture: <c>GLAM_&lt;SLOT&gt;_NAME&lt;index&gt;</c>. The index selects
+        /// the bundled font (see <see cref="NameFontKeys"/>).
         /// </summary>
-        public static string Name(GlamSlot slot, int fontIndex, bool large)
-            => $"{Prefix}{slot.Key}_NAME{fontIndex}{(large ? "L" : string.Empty)}";
+        public static string Name(GlamSlot slot, int fontIndex)
+            => $"{Prefix}{slot.Key}_NAME{fontIndex}";
 
         /// <summary>Every texture name a slot can publish — used for precise stale-name cleanup.</summary>
         public static IEnumerable<string> AllFor(GlamSlot slot)
@@ -72,7 +73,7 @@ namespace Sightseeingway.Gear
             yield return For(slot, GlamTextureKind.Dye1Name);
             yield return For(slot, GlamTextureKind.Dye2Name);
             for (var i = 0; i < NameFontKeys.Length; i++)
-                yield return Name(slot, i, true); // large only — the small set is unused
+                yield return Name(slot, i);
         }
 
         public static bool IsIdentifierSafe(string name)

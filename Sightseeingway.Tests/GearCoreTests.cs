@@ -39,12 +39,11 @@ namespace Sightseeingway.Tests
         }
 
         [Theory]
-        [InlineData(0, false, "GLAM_HEAD_NAME0")]
-        [InlineData(1, false, "GLAM_HEAD_NAME1")]
-        [InlineData(0, true, "GLAM_HEAD_NAME0L")]
-        [InlineData(3, true, "GLAM_HEAD_NAME3L")]
-        public void TextureNaming_NameVariant(int idx, bool large, string expected)
-            => Assert.Equal(expected, TextureNaming.Name(new GlamSlot(0, "HEAD"), idx, large));
+        [InlineData(0, "GLAM_HEAD_NAME0")]
+        [InlineData(1, "GLAM_HEAD_NAME1")]
+        [InlineData(3, "GLAM_HEAD_NAME3")]
+        public void TextureNaming_NameVariant(int idx, string expected)
+            => Assert.Equal(expected, TextureNaming.Name(new GlamSlot(0, "HEAD"), idx));
 
         [Fact]
         public void TextureNaming_AllFor_CoversBaseAndNameVariants()
@@ -57,8 +56,9 @@ namespace Sightseeingway.Tests
             Assert.Equal(10, all.Distinct().Count());
             Assert.Contains("GLAM_HEAD_ICON", all);
             Assert.Contains("GLAM_HEAD_DYE1NAME", all);
-            Assert.Contains("GLAM_HEAD_NAME3L", all);
-            Assert.DoesNotContain("GLAM_HEAD_NAME0", all); // small item-name set dropped (unused)
+            Assert.Contains("GLAM_HEAD_NAME0", all);
+            Assert.Contains("GLAM_HEAD_NAME3", all);
+            Assert.DoesNotContain("GLAM_HEAD_NAME0L", all); // no more "L" suffix
         }
 
         [Fact]
