@@ -1,5 +1,4 @@
 using System;
-using System.Linq;
 using SixLabors.Fonts;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Drawing.Processing;
@@ -9,37 +8,39 @@ using SixLabors.ImageSharp.Processing;
 namespace Sightseeingway.Gear
 {
     /// <summary>
-    /// Renders an item name to a white-on-transparent RGBA8 texture: RGB is white
-    /// everywhere and alpha is the glyph coverage, so a shader is free to show it
-    /// as-is, tint it (e.g. with the rarity swatch), or invert it — the preset
-    /// decides. Pure-managed via ImageSharp + Fonts.
+    /// Renders an item name to a white-on-transparent RGBA8 texture, sized to fit the
+    /// text at a target pixel height: RGB is white everywhere and alpha is the glyph
+    /// coverage, so a shader can show it as-is, tint it, or invert it. Pure-managed
+    /// via ImageSharp + Fonts.
     /// </summary>
     public static class NameTexture
     {
-        private const int Width = 256;
-        private const int Height = 28;
-        private const float FontSize = 16f;
+        private const int MaxWidth = 4096;
 
-        private static Font? _font;
-        private static bool _fontResolveFailed;
-
-        public static RawTexture? Render(string text)
+        public static RawTexture? Render(string text, FontFamily family, int heightPx)
         {
-            if (string.IsNullOrWhiteSpace(text)) return null;
+            if (string.IsNullOrWhiteSpace(text) || heightPx <= 0) return null;
 
             try
             {
-                var font = ResolveFont();
-                if (font == null) return null;
+                var fontSize = heightPx * 0.74f; // leave room for ascenders/descenders within the strip
+                var font = family.CreateFont(fontSize, FontStyle.Regular);
+                var pad = Math.Max(2, heightPx / 12);
 
-                using var img = new Image<L8>(Width, Height); // all-zero = empty coverage
-                img.Mutate(ctx => ctx.DrawText(text, font, Color.White, new PointF(2f, 4f)));
+                var measure = TextMeasurer.MeasureSize(text, new TextOptions(font));
+                var w = Math.Min(MaxWidth, (int)Math.Ceiling(measure.Width) + pad * 2);
+                var h = heightPx;
+                if (w <= 0) return null;
 
-                var coverage = new byte[Width * Height]; // L8 = 1 byte/pixel = glyph coverage
+                using var img = new Image<L8>(w, h); // 0 = empty coverage
+                var y = (h - measure.Height) / 2f;   // vertical centre
+                img.Mutate(ctx => ctx.DrawText(text, font, Color.White, new PointF(pad, y)));
+
+                var coverage = new byte[w * h];
                 img.CopyPixelDataTo(coverage);
 
                 // Expand to white-on-transparent RGBA8: RGB white everywhere, alpha = coverage.
-                var rgba = new byte[Width * Height * 4];
+                var rgba = new byte[w * h * 4];
                 for (var i = 0; i < coverage.Length; i++)
                 {
                     var o = i * 4;
@@ -49,43 +50,11 @@ namespace Sightseeingway.Gear
                     rgba[o + 3] = coverage[i];
                 }
 
-                return new RawTexture("rgba8", Width, Height, rgba);
+                return new RawTexture("rgba8", w, h, rgba);
             }
             catch (Exception ex)
             {
                 Plugin.Logger?.Debug($"Name render failed: {ex.Message}");
-                return null;
-            }
-        }
-
-        private static Font? ResolveFont()
-        {
-            if (_font != null) return _font;
-            if (_fontResolveFailed) return null;
-
-            try
-            {
-                FontFamily family;
-                if (SystemFonts.TryGet("Arial", out var arial)) family = arial;
-                else if (SystemFonts.TryGet("Segoe UI", out var segoe)) family = segoe;
-                else
-                {
-                    var families = SystemFonts.Families.ToList();
-                    if (families.Count == 0)
-                    {
-                        _fontResolveFailed = true;
-                        return null;
-                    }
-                    family = families[0];
-                }
-
-                _font = family.CreateFont(FontSize, FontStyle.Regular);
-                return _font;
-            }
-            catch (Exception ex)
-            {
-                _fontResolveFailed = true;
-                Plugin.Logger?.Debug($"Font resolution failed: {ex.Message}");
                 return null;
             }
         }

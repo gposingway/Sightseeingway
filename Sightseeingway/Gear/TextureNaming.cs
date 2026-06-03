@@ -1,15 +1,15 @@
+using System.Collections.Generic;
 using System.Text.RegularExpressions;
 
 namespace Sightseeingway.Gear
 {
     /// <summary>
-    /// The texture "kinds" published per slot. Each becomes a
-    /// <c>GLAM_&lt;SLOT&gt;_&lt;KIND&gt;</c> texture semantic on the Shadingway bus.
+    /// Per-slot textures with a single fixed name. The name label is not here — it
+    /// has font/height variants (see <see cref="TextureNaming.Name"/>).
     /// </summary>
     public enum GlamTextureKind
     {
         Icon,
-        Name,
         Rarity,
         Dye1,
         Dye2,
@@ -23,6 +23,17 @@ namespace Sightseeingway.Gear
     {
         public const string Prefix = "GLAM_";
 
+        /// <summary>
+        /// Fonts for name-label variants, in index order — the index is the bus-name
+        /// token (NAME0..3). 0 = Inter (sans), 1 = Cinzel (epic caps), 2 = EB Garamond
+        /// (serif), 3 = Cormorant (glamour serif). Must match <see cref="GlamFonts"/>.
+        /// </summary>
+        public static readonly string[] NameFontKeys = { "INTER", "CINZEL", "GARAMOND", "CORMORANT" };
+
+        /// <summary>The two texture heights (px): small (no suffix) and large ("L").</summary>
+        public const int NameHeightSmall = 28;
+        public const int NameHeightLarge = 128;
+
         // Shadingway requires identifier-safe names: [A-Za-z_][A-Za-z0-9_]*, <= 64 chars.
         private static readonly Regex IdentifierPattern =
             new("^[A-Za-z_][A-Za-z0-9_]*$", RegexOptions.Compiled);
@@ -33,12 +44,33 @@ namespace Sightseeingway.Gear
         public static string Suffix(GlamTextureKind kind) => kind switch
         {
             GlamTextureKind.Icon   => "ICON",
-            GlamTextureKind.Name   => "NAME",
             GlamTextureKind.Rarity => "RARITY",
             GlamTextureKind.Dye1   => "DYE1",
             GlamTextureKind.Dye2   => "DYE2",
             _ => "UNKNOWN",
         };
+
+        /// <summary>
+        /// A name-label variant: <c>GLAM_&lt;SLOT&gt;_NAME&lt;index&gt;</c> (small) or
+        /// <c>…NAME&lt;index&gt;L</c> (large). The index selects the font (see
+        /// <see cref="NameFontKeys"/>).
+        /// </summary>
+        public static string Name(GlamSlot slot, int fontIndex, bool large)
+            => $"{Prefix}{slot.Key}_NAME{fontIndex}{(large ? "L" : string.Empty)}";
+
+        /// <summary>Every texture name a slot can publish — used for precise stale-name cleanup.</summary>
+        public static IEnumerable<string> AllFor(GlamSlot slot)
+        {
+            yield return For(slot, GlamTextureKind.Icon);
+            yield return For(slot, GlamTextureKind.Rarity);
+            yield return For(slot, GlamTextureKind.Dye1);
+            yield return For(slot, GlamTextureKind.Dye2);
+            for (var i = 0; i < NameFontKeys.Length; i++)
+            {
+                yield return Name(slot, i, false);
+                yield return Name(slot, i, true);
+            }
+        }
 
         public static bool IsIdentifierSafe(string name)
             => !string.IsNullOrEmpty(name) && name.Length <= 64 && IdentifierPattern.IsMatch(name);

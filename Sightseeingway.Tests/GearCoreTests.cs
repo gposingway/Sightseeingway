@@ -28,7 +28,6 @@ namespace Sightseeingway.Tests
 
         [Theory]
         [InlineData("HEAD", GlamTextureKind.Icon, "GLAM_HEAD_ICON")]
-        [InlineData("BODY", GlamTextureKind.Name, "GLAM_BODY_NAME")]
         [InlineData("RINGR", GlamTextureKind.Rarity, "GLAM_RINGR_RARITY")]
         [InlineData("MAINHAND", GlamTextureKind.Dye1, "GLAM_MAINHAND_DYE1")]
         [InlineData("OFFHAND", GlamTextureKind.Dye2, "GLAM_OFFHAND_DYE2")]
@@ -38,18 +37,37 @@ namespace Sightseeingway.Tests
             Assert.Equal(expected, TextureNaming.For(slot, kind));
         }
 
+        [Theory]
+        [InlineData(0, false, "GLAM_HEAD_NAME0")]
+        [InlineData(1, false, "GLAM_HEAD_NAME1")]
+        [InlineData(0, true, "GLAM_HEAD_NAME0L")]
+        [InlineData(3, true, "GLAM_HEAD_NAME3L")]
+        public void TextureNaming_NameVariant(int idx, bool large, string expected)
+            => Assert.Equal(expected, TextureNaming.Name(new GlamSlot(0, "HEAD"), idx, large));
+
         [Fact]
-        public void TextureNaming_AllGeneratedNamesAreIdentifierSafe()
+        public void TextureNaming_AllFor_CoversBaseAndNameVariants()
+        {
+            var slot = new GlamSlot(2, "HEAD");
+            var all = TextureNaming.AllFor(slot).ToList();
+
+            // 4 base (icon, rarity, dye1, dye2) + 4 fonts × 2 heights = 12, all unique.
+            Assert.Equal(12, all.Count);
+            Assert.Equal(12, all.Distinct().Count());
+            Assert.Contains("GLAM_HEAD_ICON", all);
+            Assert.Contains("GLAM_HEAD_NAME0", all);
+            Assert.Contains("GLAM_HEAD_NAME3L", all);
+        }
+
+        [Fact]
+        public void TextureNaming_AllPublishedNamesAreIdentifierSafe()
         {
             foreach (var slot in GlamSlots.All)
-            {
-                foreach (GlamTextureKind kind in System.Enum.GetValues<GlamTextureKind>())
+                foreach (var name in TextureNaming.AllFor(slot))
                 {
-                    var name = TextureNaming.For(slot, kind);
                     Assert.True(TextureNaming.IsIdentifierSafe(name), $"unsafe: {name}");
                     Assert.True(name.Length <= 64);
                 }
-            }
         }
 
         [Theory]

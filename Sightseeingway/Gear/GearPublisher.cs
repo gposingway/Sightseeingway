@@ -28,12 +28,6 @@ namespace Sightseeingway.Gear
         private const long SyncIntervalMs = 5000; // periodic connect/retry, independent of gear changes
         private static readonly TimeSpan Debounce = TimeSpan.FromMilliseconds(500);
 
-        private static readonly GlamTextureKind[] AllKinds =
-        {
-            GlamTextureKind.Icon, GlamTextureKind.Name, GlamTextureKind.Rarity,
-            GlamTextureKind.Dye1, GlamTextureKind.Dye2,
-        };
-
         private readonly HttpClient _http;
         private readonly ShadingwayClient _client;
         private readonly CancellationTokenSource _cts = new();
@@ -234,9 +228,17 @@ namespace Sightseeingway.Gear
             if (icon != null)
                 Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Icon), icon);
 
-            var name = NameTexture.Render(slot.Name);
-            if (name != null)
-                Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Name), name);
+            // Name label in each bundled font (index) at small (28) and large (128) heights.
+            for (var i = 0; i < TextureNaming.NameFontKeys.Length; i++)
+            {
+                if (GlamFonts.Get(TextureNaming.NameFontKeys[i]) is not { } family) continue;
+
+                var small = NameTexture.Render(slot.Name, family, TextureNaming.NameHeightSmall);
+                if (small != null) Stage(built, newNames, TextureNaming.Name(slot.Slot, i, false), small);
+
+                var large = NameTexture.Render(slot.Name, family, TextureNaming.NameHeightLarge);
+                if (large != null) Stage(built, newNames, TextureNaming.Name(slot.Slot, i, true), large);
+            }
 
             Stage(built, newNames, TextureNaming.For(slot.Slot, GlamTextureKind.Rarity),
                 Swatch(SwatchFactory.RaritySwatch(slot.Rarity)));
@@ -255,9 +257,8 @@ namespace Sightseeingway.Gear
 
             // Delete any of this slot's names that are no longer present (e.g. a removed dye),
             // then make _publishedNames reflect exactly this slot's current set.
-            foreach (var kind in AllKinds)
+            foreach (var n in TextureNaming.AllFor(slot.Slot))
             {
-                var n = TextureNaming.For(slot.Slot, kind);
                 if (!newNames.Contains(n) && _publishedNames.Contains(n))
                     await _client.DeleteTextureAsync(baseUrl, n, ct);
                 _publishedNames.Remove(n);
@@ -274,12 +275,9 @@ namespace Sightseeingway.Gear
             foreach (var s in GlamSlots.All)
             {
                 if (s.Key != slotKey) continue;
-                foreach (var kind in AllKinds)
-                {
-                    var n = TextureNaming.For(s, kind);
+                foreach (var n in TextureNaming.AllFor(s))
                     if (_publishedNames.Remove(n))
                         await _client.DeleteTextureAsync(baseUrl, n, ct);
-                }
                 break;
             }
             _publishedSlots.Remove(slotKey);

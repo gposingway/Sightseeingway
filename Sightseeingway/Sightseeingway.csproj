@@ -24,4 +24,10 @@
     <PackageReference Include="SixLabors.ImageSharp.Drawing" Version="2.1.6" />
     <PackageReference Include="SixLabors.Fonts" Version="2.1.3" />
   </ItemGroup>
+
+  <!-- Bundled OFL fonts for gear name labels (embedded so output is identical for every player). -->
+  <ItemGroup>
+    <EmbeddedResource Include="Fonts\*.ttf" />
+    <None Include="Fonts\*-OFL.txt" Pack="false" />
+  </ItemGroup>
 </Project>
