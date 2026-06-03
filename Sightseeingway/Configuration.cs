@@ -10,7 +10,7 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public const int CurrentVersion = 5;
+        public const int CurrentVersion = 6;
 
         public int Version { get; set; } = CurrentVersion;
 
@@ -46,6 +46,17 @@ namespace Sightseeingway
         public Dictionary<string, bool> MetadataFields { get; set; } = DefaultMetadataFields();
 
         public LogVerbosity LogVerbosity { get; set; } = LogVerbosity.Status;
+
+        // --- v1.5 additions: Gear publishing (glamour texture bus → Shadingway) ---
+
+        /// <summary>Opt-in: push the player's visible gear as textures to Shadingway.</summary>
+        public bool GearPublishEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Loopback port where Shadingway's HTTP server is expected. Discovery
+        /// confirms or corrects this via /hello; this is just the starting guess.
+        /// </summary>
+        public int GearShadingwayPort { get; set; } = 48756;
 
         // --- Deprecated (kept for one version cycle for cross-version safety) ---
 
@@ -98,7 +109,15 @@ namespace Sightseeingway
 
                 MetadataFields ??= DefaultMetadataFields();
 
-                Version = CurrentVersion;
+                Version = 5;
+            }
+
+            // v6 added Gear publishing fields; their property initializers supply
+            // safe defaults when absent from an older config, so the bump is a no-op
+            // beyond recording the version.
+            if (Version < 6)
+            {
+                Version = 6;
             }
 #pragma warning restore CS0618
         }

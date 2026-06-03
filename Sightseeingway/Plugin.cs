@@ -24,6 +24,8 @@ namespace Sightseeingway
         [PluginService] internal static IGameConfig GameConfig { get; private set; } = null!;
         [PluginService] internal static IDataManager DataManager { get; private set; } = null!;
         [PluginService] internal static IObjectTable ObjectTable { get; private set; } = null!;
+        [PluginService] internal static IGameInventory GameInventory { get; private set; } = null!;
+        [PluginService] internal static ITextureReadbackProvider TextureReadback { get; private set; } = null!;
         [PluginService] internal static IPluginLog Log { get; private set; } = null!;
         [PluginService] internal static IChatGui ChatGui { get; private set; } = null!;
         [PluginService] internal static ICommandManager CommandManager { get; private set; } = null!;
@@ -36,6 +38,9 @@ namespace Sightseeingway
 
         // Background metadata pipeline (sidecar lifecycle + worker).
         public static MetadataPipeline? MetadataPipeline { get; private set; } = null;
+
+        // Visible-gear → Shadingway texture publisher (opt-in via config).
+        public static Gear.GearPublisher? GearPublisher { get; private set; } = null;
 
         private readonly List<FileSystemWatcher> screenshotWatchers = [];
         private readonly List<string> directoriesToMonitor = [];
@@ -104,6 +109,10 @@ namespace Sightseeingway
                 // Start the worker only once watchers are wired so the recovery scan
                 // sees an accurate set of monitored directories.
                 MetadataPipeline.Start();
+
+                // Gear publisher subscribes to the framework tick; it stays idle until
+                // the user opts in (Config.GearPublishEnabled).
+                GearPublisher = new Gear.GearPublisher();
 
                 Logger.Debug("Plugin constructor finished.");
             }
@@ -412,6 +421,10 @@ namespace Sightseeingway
 
             DisposeScreenshotWatchers();
             DisposeShadingwayWatcher();
+
+            // Stop publishing gear and unhook the framework tick.
+            GearPublisher?.Dispose();
+            GearPublisher = null;
 
             // Stop the worker; pending sidecars (if any) survive on disk for the next launch's recovery.
             IO.Pipeline = null;

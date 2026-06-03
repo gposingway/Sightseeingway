@@ -23,6 +23,9 @@ namespace Sightseeingway
         private readonly MetadataConfigComponent metadataConfig;
         private readonly MetadataPreviewComponent metadataPreview;
 
+        // Gear tab
+        private readonly GearComponent gear;
+
         // Diagnostics
         private readonly DiagnosticsComponent diagnostics;
 
@@ -44,6 +47,7 @@ namespace Sightseeingway
             filenamePreview = new FilenamePreviewComponent();
             metadataConfig = new MetadataConfigComponent();
             metadataPreview = new MetadataPreviewComponent();
+            gear = new GearComponent();
             diagnostics = new DiagnosticsComponent();
         }
 
@@ -72,6 +76,8 @@ namespace Sightseeingway
                 EmbedMetadata = config.EmbedMetadata,
                 MetadataFields = new System.Collections.Generic.Dictionary<string, bool>(config.MetadataFields),
                 LogVerbosity = config.LogVerbosity,
+                GearPublishEnabled = config.GearPublishEnabled,
+                GearShadingwayPort = config.GearShadingwayPort,
             };
         }
 
@@ -86,6 +92,38 @@ namespace Sightseeingway
 
             ImGui.BeginChild("##ContentRegion", new Vector2(-1, contentHeight), false);
 
+            if (ImGui.BeginTabBar("##SightseeingwayTabs"))
+            {
+                if (ImGui.BeginTabItem("Screenshots"))
+                {
+                    DrawScreenshotsTab();
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Gear"))
+                {
+                    if (gear.Render(tempConfig)) configChanged = true;
+                    ImGui.EndTabItem();
+                }
+
+                ImGui.EndTabBar();
+            }
+
+            ImGui.EndChild();
+
+            ImGui.Separator();
+            DrawButtonRow();
+
+            // Refresh previews if anything changed during this draw.
+            if (configChanged)
+            {
+                tempConfig.SelectedFields = fieldOrdering.GetSelectedFieldsString();
+                RefreshPreviews();
+            }
+        }
+
+        private void DrawScreenshotsTab()
+        {
             if (ImGui.BeginTable("##MainTwoColumn", 2, ImGuiTableFlags.BordersInnerV | ImGuiTableFlags.SizingStretchSame))
             {
                 ImGui.TableNextRow();
@@ -111,18 +149,6 @@ namespace Sightseeingway
             ImGui.Spacing();
 
             if (diagnostics.Render(tempConfig)) configChanged = true;
-
-            ImGui.EndChild();
-
-            ImGui.Separator();
-            DrawButtonRow();
-
-            // Refresh previews if anything changed during this draw.
-            if (configChanged)
-            {
-                tempConfig.SelectedFields = fieldOrdering.GetSelectedFieldsString();
-                RefreshPreviews();
-            }
         }
 
         private bool DrawFilenameColumn()
@@ -297,6 +323,14 @@ namespace Sightseeingway
                 Plugin.Logger?.SetVerbosity(config.LogVerbosity);
                 Plugin.Logger?.UserMessage($"Logging verbosity: {config.LogVerbosity}");
             }
+
+            // Gear publishing settings. The publisher reads these live each tick;
+            // when the feature is switched off, clear what we put on the bus.
+            var gearWasEnabled = config.GearPublishEnabled;
+            config.GearPublishEnabled = tempConfig.GearPublishEnabled;
+            config.GearShadingwayPort = tempConfig.GearShadingwayPort;
+            if (gearWasEnabled && !config.GearPublishEnabled)
+                _ = Plugin.GearPublisher?.FlushAsync();
         }
 
         private void ResetToDefaults()
@@ -306,6 +340,8 @@ namespace Sightseeingway
             tempConfig.EmbedMetadata = false;
             tempConfig.MetadataFields = Configuration.DefaultMetadataFields();
             tempConfig.LogVerbosity = LogVerbosity.Status;
+            tempConfig.GearPublishEnabled = false;
+            tempConfig.GearShadingwayPort = 48756;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
         }
 
