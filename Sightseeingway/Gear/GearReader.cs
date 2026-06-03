@@ -33,7 +33,11 @@ namespace Sightseeingway.Gear
                     var inv = items[slot.EquipIndex];
 
                     // Visible item = the glamour override when present, else the real item.
-                    var visibleId = inv.GlamourId != 0 ? inv.GlamourId : inv.ItemId;
+                    // Use BaseItemId, not ItemId: equipped HQ/collectible items carry an id
+                    // offset (+1,000,000 / +500,000) that has no row in the Item sheet, which
+                    // would make every HQ slot resolve to nothing. Glamour ids are already
+                    // base, and NQ/HQ share an appearance, so BaseItemId is also the right key.
+                    var visibleId = inv.GlamourId != 0 ? inv.GlamourId : inv.BaseItemId;
                     if (visibleId == 0) continue; // empty slot
 
                     var row = itemSheet.GetRow(visibleId);
@@ -56,6 +60,11 @@ namespace Sightseeingway.Gear
                         ResolveStainColor(stainSheet, stain0),
                         ResolveStainColor(stainSheet, stain1)));
                 }
+
+                // Diagnostic: equipped items present but nothing resolved usually means an
+                // id-offset / sheet-lookup issue worth seeing under /sway debug.
+                if (result.Count == 0 && items.Length > 0)
+                    Plugin.Logger?.Debug($"Gear read: {items.Length} equipped items, 0 resolved.");
             }
             catch (Exception ex)
             {
