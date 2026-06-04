@@ -51,13 +51,19 @@ namespace Sightseeingway.Gear
                     var visibleId = inv.GlamourId != 0 ? inv.GlamourId : inv.BaseItemId;
                     if (visibleId == 0) continue; // empty slot
 
+                    // Rendered model + dyes from the draw data — the game's already-collapsed
+                    // result: glamour/plate appearance when glamoured, raw colour when not.
+                    ushort model = 0;
+                    byte stain0 = 0, stain1 = 0;
+                    if (chara != null) (model, stain0, stain1) = ReadDrawModel(chara, slot.Key);
+
+                    // Model id 0 renders nothing on screen — an empty/hidden slot, an empty
+                    // off-hand, or an "invisible" glamour (e.g. The Emperor's New …). That isn't
+                    // visible gear, so skip it. (Only when we have draw data to read it from.)
+                    if (chara != null && model == 0) continue;
+
                     var row = itemSheet.GetRow(visibleId);
                     if (row.RowId == 0) continue;
-
-                    // Rendered (visible) dyes from the draw data — the game's already-collapsed
-                    // result: glamour/plate colour when glamoured, raw colour when not.
-                    byte stain0 = 0, stain1 = 0;
-                    if (chara != null) (stain0, stain1) = ReadDrawStains(chara, slot.Key);
 
                     var name = row.Name.ExtractText();
 
@@ -97,26 +103,27 @@ namespace Sightseeingway.Gear
             return result;
         }
 
-        /// <summary>Reads the two rendered dye-channel ids for a slot from the draw data.</summary>
-        private static unsafe (byte, byte) ReadDrawStains(Character* chara, string slotKey)
+        /// <summary>Reads the rendered primary model id and the two dye-channel ids for a slot
+        /// from the draw data. A model id of 0 means the slot draws nothing (empty or invisible).</summary>
+        private static unsafe (ushort Model, byte Stain0, byte Stain1) ReadDrawModel(Character* chara, string slotKey)
         {
             switch (slotKey)
             {
                 case "MAINHAND":
                 {
                     var m = chara->DrawData.Weapon(DrawDataContainer.WeaponSlot.MainHand).ModelId;
-                    return (m.Stain0, m.Stain1);
+                    return (m.Id, m.Stain0, m.Stain1);
                 }
                 case "OFFHAND":
                 {
                     var o = chara->DrawData.Weapon(DrawDataContainer.WeaponSlot.OffHand).ModelId;
-                    return (o.Stain0, o.Stain1);
+                    return (o.Id, o.Stain0, o.Stain1);
                 }
                 default:
                 {
-                    if (!TryEquipSlot(slotKey, out var es)) return (0, 0);
+                    if (!TryEquipSlot(slotKey, out var es)) return (0, 0, 0);
                     var e = chara->DrawData.Equipment(es);
-                    return (e.Stain0, e.Stain1);
+                    return (e.Id, e.Stain0, e.Stain1);
                 }
             }
         }

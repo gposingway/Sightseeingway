@@ -133,7 +133,7 @@ For each visible slot the plugin publishes:
 *   both **dye** colours and their **names**,
 *   the item **category**, a **level** line (*Lv. / Ilvl*), and a **Unique** tag where it applies.
 
-Slots cover the twelve equipment pieces (main/off hand, head, body, hands, legs, feet, earrings, necklace, bracelets, and both rings) plus **facewear** (Dawntrail glasses) and the active **fashion accessory** (parasol, wings, …). Each text label is white-on-transparent so a shader can tint, recolour, or invert it freely; an empty slot or absent value simply isn't bound.
+Slots cover the twelve equipment pieces (main/off hand, head, body, hands, legs, feet, earrings, necklace, bracelets, and both rings) plus **facewear** (Dawntrail glasses) and the active **fashion accessory** (parasol, wings, …). Each text label is white-on-transparent so a shader can tint, recolour, or invert it freely. A slot that draws nothing on screen — empty, an empty off-hand, or an **invisible glamour** (*The Emperor's New …*) — is treated as not-visible and isn't published, so the sheet matches what you actually see.
 
 The feature is **on by default** and managed from the **Gear** tab (see [Configuration](#configuration)). Shader and preset authors: the full producer contract — texture names, pixel formats, the metric uniforms, and the discovery handshake — lives in [Shadingway](https://github.com/gposingway/shadingway)'s `docs/api/external-textures.md`.
 
