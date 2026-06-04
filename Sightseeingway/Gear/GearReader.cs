@@ -19,8 +19,8 @@ namespace Sightseeingway.Gear
         /// Reads the player's currently visible gear, or <c>null</c> when the read can't be
         /// trusted (no rendered character / missing data) — distinct from an empty list, which
         /// means "logged out, nothing equipped". The caller treats null as "hold the last
-        /// published state" so a transient blip (zoning, cutscene) never publishes a misleading
-        /// inventory-only read in which an invisible-glamoured slot momentarily reappears.
+        /// published state" so a transient blip (zoning, cutscene) never publishes a degraded,
+        /// dye-less read; the next poll with a player present produces the real one.
         /// </summary>
         public static unsafe IReadOnlyList<GearSlotData>? ReadVisibleGear()
         {
@@ -45,9 +45,9 @@ namespace Sightseeingway.Gear
                 var player = Plugin.ObjectTable.LocalPlayer;
                 var chara = player != null ? (Character*)player.Address : null;
 
-                // No rendered character → we can't read dyes or tell which slots are hidden.
-                // Hold the last published state rather than fall back to a misleading
-                // inventory-only read (which would un-hide invisible glamours).
+                // No rendered character → we can't read the rendered dyes. Hold the last
+                // published state rather than publish a degraded inventory-only read; the
+                // next poll with a player present produces the real one.
                 if (chara == null) return null;
 
                 foreach (var slot in GlamSlots.All)
@@ -69,17 +69,12 @@ namespace Sightseeingway.Gear
                     var visibleId = inv.GlamourId != 0 ? inv.GlamourId : inv.BaseItemId;
                     if (visibleId == 0) continue; // empty slot
 
-                    // Rendered model + dyes from the draw data — the game's already-collapsed
-                    // result: glamour/plate appearance when glamoured, raw colour when not.
-                    var (model, stain0, stain1) = ReadDrawModel(chara, slot.Key);
-
-                    // Model id 0 renders nothing on screen — an empty/hidden slot, an empty
-                    // off-hand, or an "invisible" glamour (e.g. The Emperor's New …). That isn't
-                    // visible gear, so skip it — exactly the same outcome as an empty off-hand.
-                    if (model == 0) continue;
-
                     var row = itemSheet.GetRow(visibleId);
                     if (row.RowId == 0) continue;
+
+                    // Rendered (visible) dyes from the draw data — the game's already-collapsed
+                    // result: glamour/plate colour when glamoured, raw colour when not.
+                    var (stain0, stain1) = ReadDrawStains(chara, slot.Key);
 
                     var name = row.Name.ExtractText();
 
@@ -120,27 +115,26 @@ namespace Sightseeingway.Gear
             return result;
         }
 
-        /// <summary>Reads the rendered primary model id and the two dye-channel ids for a slot
-        /// from the draw data. A model id of 0 means the slot draws nothing (empty or invisible).</summary>
-        private static unsafe (ushort Model, byte Stain0, byte Stain1) ReadDrawModel(Character* chara, string slotKey)
+        /// <summary>Reads the two rendered dye-channel ids for a slot from the draw data.</summary>
+        private static unsafe (byte Stain0, byte Stain1) ReadDrawStains(Character* chara, string slotKey)
         {
             switch (slotKey)
             {
                 case "MAINHAND":
                 {
                     var m = chara->DrawData.Weapon(DrawDataContainer.WeaponSlot.MainHand).ModelId;
-                    return (m.Id, m.Stain0, m.Stain1);
+                    return (m.Stain0, m.Stain1);
                 }
                 case "OFFHAND":
                 {
                     var o = chara->DrawData.Weapon(DrawDataContainer.WeaponSlot.OffHand).ModelId;
-                    return (o.Id, o.Stain0, o.Stain1);
+                    return (o.Stain0, o.Stain1);
                 }
                 default:
                 {
-                    if (!TryEquipSlot(slotKey, out var es)) return (0, 0, 0);
+                    if (!TryEquipSlot(slotKey, out var es)) return (0, 0);
                     var e = chara->DrawData.Equipment(es);
-                    return (e.Id, e.Stain0, e.Stain1);
+                    return (e.Stain0, e.Stain1);
                 }
             }
         }
