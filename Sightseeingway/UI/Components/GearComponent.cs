@@ -88,7 +88,8 @@ namespace Sightseeingway.UI.Components
             var now = Environment.TickCount64;
             if (now - _lastRefreshTicks > 500)
             {
-                try { _cached = GearReader.ReadVisibleGear(); }
+                // null = unreliable read (transient); keep showing the last good snapshot.
+                try { if (GearReader.ReadVisibleGear() is { } read) _cached = read; }
                 catch (Exception ex) { Plugin.Logger?.Debug($"Gear preview read failed: {ex.Message}"); }
                 _lastRefreshTicks = now;
             }

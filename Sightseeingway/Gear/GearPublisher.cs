@@ -109,7 +109,7 @@ namespace Sightseeingway.Gear
             if (now - _lastPollTicks < PollIntervalMs) return;
             _lastPollTicks = now;
 
-            IReadOnlyList<GearSlotData> slots;
+            IReadOnlyList<GearSlotData>? slots;
             try
             {
                 slots = GearReader.ReadVisibleGear();
@@ -119,6 +119,10 @@ namespace Sightseeingway.Gear
                 Plugin.Logger?.Debug($"Gear poll failed: {ex.Message}");
                 return;
             }
+
+            // null = the read couldn't be trusted (no local player, data not ready). Hold the
+            // last published state — don't clear the bus or push a misleading inventory-only read.
+            if (slots == null) return;
 
             var sig = GearSignature.Of(slots);
             if (sig != _lastSignature)
@@ -262,32 +266,51 @@ namespace Sightseeingway.Gear
             foreach (var t in built)
                 if (await _client.PostTextureAsync(baseUrl, t, ct)) ok++;
 
-            // Delete any of this slot's names that are no longer present (e.g. a removed dye),
-            // then make _publishedNames reflect exactly this slot's current set.
+            // Delete any of this slot's names that are no longer present (e.g. an icon that
+            // failed to render this cycle). Only forget a deleted name once its DELETE lands.
+            var allStaleCleared = true;
             foreach (var n in TextureNaming.AllFor(slot.Slot))
             {
-                if (!newNames.Contains(n) && _publishedNames.Contains(n))
-                    await _client.DeleteTextureAsync(baseUrl, n, ct);
-                _publishedNames.Remove(n);
+                if (newNames.Contains(n)) continue;
+                if (!_publishedNames.Contains(n)) continue;
+                if (await _client.DeleteTextureAsync(baseUrl, n, ct))
+                    _publishedNames.Remove(n);
+                else
+                    allStaleCleared = false;
             }
             foreach (var n in newNames) _publishedNames.Add(n);
 
-            _publishedSlots[slot.Slot.Key] = slot.Signature();
+            // Record this slot's signature only when its stale-name cleanup fully landed. If a
+            // delete failed, drop the slot's tracking entry instead, so next cycle it counts as
+            // "new" and re-enters toPush to retry — otherwise a present slot whose signature
+            // still matches is matched out of both toPush and toRemove and never revisited,
+            // stranding the un-deleted name forever.
+            if (allStaleCleared) _publishedSlots[slot.Slot.Key] = slot.Signature();
+            else _publishedSlots.Remove(slot.Slot.Key);
             return (ok, built.Count);
         }
 
-        /// <summary>Deletes everything for a slot that is no longer worn.</summary>
+        /// <summary>Deletes everything for a slot that is no longer worn (unequipped, empty
+        /// off-hand, or an invisible glamour). A name is only forgotten once its DELETE actually
+        /// lands; if any delete fails the slot stays tracked, so the next delta or the 5s
+        /// heartbeat re-issues the missing deletes instead of stranding stale textures.</summary>
         private async Task RemoveSlotAsync(string baseUrl, string slotKey, CancellationToken ct)
         {
+            var allCleared = true;
             foreach (var s in GlamSlots.All)
             {
                 if (s.Key != slotKey) continue;
                 foreach (var n in TextureNaming.AllFor(s))
-                    if (_publishedNames.Remove(n))
-                        await _client.DeleteTextureAsync(baseUrl, n, ct);
+                {
+                    if (!_publishedNames.Contains(n)) continue;
+                    if (await _client.DeleteTextureAsync(baseUrl, n, ct))
+                        _publishedNames.Remove(n);
+                    else
+                        allCleared = false;
+                }
                 break;
             }
-            _publishedSlots.Remove(slotKey);
+            if (allCleared) _publishedSlots.Remove(slotKey);
         }
 
         /// <summary>Removes everything this publisher owns from the bus (disable/logout).</summary>

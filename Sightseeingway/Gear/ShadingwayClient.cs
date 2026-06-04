@@ -116,17 +116,24 @@ namespace Sightseeingway.Gear
             }
         }
 
-        public async Task DeleteTextureAsync(string baseUrl, string name, CancellationToken ct)
+        /// <summary>Deletes a texture. Returns true only when the bus confirms it's gone — a
+        /// 2xx, or a 404 (already absent). A transient failure returns false so the caller can
+        /// keep the name tracked and retry, rather than stranding a stale texture on the bus.</summary>
+        public async Task<bool> DeleteTextureAsync(string baseUrl, string name, CancellationToken ct)
         {
             try
             {
                 using var resp = await _http.DeleteAsync($"{baseUrl}/textures/{name}", ct);
-                _ = resp.StatusCode; // best-effort
+                if (resp.IsSuccessStatusCode || resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    return true;
+                Plugin.Logger?.Debug($"DELETE {name} → {(int)resp.StatusCode} (will retry)");
+                return false;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex)
             {
-                Plugin.Logger?.Debug($"DELETE {name} failed: {ex.Message}");
+                Plugin.Logger?.Debug($"DELETE {name} failed: {ex.Message} (will retry)");
+                return false;
             }
         }
     }

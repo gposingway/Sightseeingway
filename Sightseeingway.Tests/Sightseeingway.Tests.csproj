@@ -24,6 +24,7 @@
     <Compile Include="..\Sightseeingway\FilenameField.cs" Link="Linked\FilenameField.cs" />
     <Compile Include="..\Sightseeingway\Constants.cs" Link="Linked\Constants.cs" />
     <Compile Include="..\Sightseeingway\Gear\GlamSlot.cs" Link="Linked\Gear\GlamSlot.cs" />
+    <Compile Include="..\Sightseeingway\Gear\GearModels.cs" Link="Linked\Gear\GearModels.cs" />
     <Compile Include="..\Sightseeingway\Gear\TextureNaming.cs" Link="Linked\Gear\TextureNaming.cs" />
     <Compile Include="..\Sightseeingway\Gear\SwatchFactory.cs" Link="Linked\Gear\SwatchFactory.cs" />
   </ItemGroup>

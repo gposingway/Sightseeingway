@@ -15,22 +15,40 @@ namespace Sightseeingway.Gear
     /// </summary>
     public static class GearReader
     {
-        public static unsafe IReadOnlyList<GearSlotData> ReadVisibleGear()
+        /// <summary>
+        /// Reads the player's currently visible gear, or <c>null</c> when the read can't be
+        /// trusted (no rendered character / missing data) — distinct from an empty list, which
+        /// means "logged out, nothing equipped". The caller treats null as "hold the last
+        /// published state" so a transient blip (zoning, cutscene) never publishes a misleading
+        /// inventory-only read in which an invisible-glamoured slot momentarily reappears.
+        /// </summary>
+        public static unsafe IReadOnlyList<GearSlotData>? ReadVisibleGear()
         {
             var result = new List<GearSlotData>(GlamSlots.All.Count);
 
             try
             {
+                // Logged out (title / character select) → clear the bus definitively. The
+                // equipped-items container can linger in memory after the local player is torn
+                // down on logout, so gate on login state, not inventory emptiness — otherwise
+                // the chara==null "hold" below would keep the last character's gear resident.
+                if (!Plugin.ClientState.IsLoggedIn) return result; // empty → clear
+
                 var items = Plugin.GameInventory.GetInventoryItems(GameInventoryType.EquippedItems);
-                if (items.Length == 0) return result;
+                if (items.Length == 0) return result; // nothing equipped → clear bus
 
                 var itemSheet = Plugin.DataManager.GetExcelSheet<Item>();
-                if (itemSheet == null) return result;
+                if (itemSheet == null) return null; // data not ready → hold
 
                 var stainSheet = Plugin.DataManager.GetExcelSheet<Stain>();
 
                 var player = Plugin.ObjectTable.LocalPlayer;
                 var chara = player != null ? (Character*)player.Address : null;
+
+                // No rendered character → we can't read dyes or tell which slots are hidden.
+                // Hold the last published state rather than fall back to a misleading
+                // inventory-only read (which would un-hide invisible glamours).
+                if (chara == null) return null;
 
                 foreach (var slot in GlamSlots.All)
                 {
@@ -53,14 +71,12 @@ namespace Sightseeingway.Gear
 
                     // Rendered model + dyes from the draw data — the game's already-collapsed
                     // result: glamour/plate appearance when glamoured, raw colour when not.
-                    ushort model = 0;
-                    byte stain0 = 0, stain1 = 0;
-                    if (chara != null) (model, stain0, stain1) = ReadDrawModel(chara, slot.Key);
+                    var (model, stain0, stain1) = ReadDrawModel(chara, slot.Key);
 
                     // Model id 0 renders nothing on screen — an empty/hidden slot, an empty
                     // off-hand, or an "invisible" glamour (e.g. The Emperor's New …). That isn't
-                    // visible gear, so skip it. (Only when we have draw data to read it from.)
-                    if (chara != null && model == 0) continue;
+                    // visible gear, so skip it — exactly the same outcome as an empty off-hand.
+                    if (model == 0) continue;
 
                     var row = itemSheet.GetRow(visibleId);
                     if (row.RowId == 0) continue;
@@ -98,6 +114,7 @@ namespace Sightseeingway.Gear
             catch (Exception ex)
             {
                 Plugin.Logger?.Debug($"Gear read failed: {ex.Message}");
+                return null; // unreliable read → hold the last published state
             }
 
             return result;

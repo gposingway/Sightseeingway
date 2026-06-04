@@ -34,6 +34,25 @@ namespace Sightseeingway.Tests
             Assert.True(GlamSlots.FacewearIndex > 13 && GlamSlots.FashionIndex > 13);
         }
 
+        // ---- Change detection ----
+
+        [Fact]
+        public void GearSignature_ChangesWhenASlotIsDropped()
+        {
+            // A slot going invisible (The Emperor's New …) or being unequipped drops it from the
+            // read. The overall signature MUST change so the publisher notices and removes that
+            // slot's textures — this is what makes "visible -> hidden" reach the bus.
+            var head = new GearSlotData(new GlamSlot(2, "HEAD"), 100u, 1u, "Hat", 1,
+                0, 0, 0u, 0u, "", "", "", "", "");
+            var body = new GearSlotData(new GlamSlot(3, "BODY"), 200u, 2u, "Robe", 1,
+                0, 0, 0u, 0u, "", "", "", "", "");
+
+            var withHead = GearSignature.Of(new[] { head, body });
+            var withoutHead = GearSignature.Of(new[] { body });
+
+            Assert.NotEqual(withHead, withoutHead);
+        }
+
         // ---- Texture naming ----
 
         [Theory]
