@@ -35,6 +35,10 @@ namespace Sightseeingway.CharacterCard
         /// (e.g. <c>CHAR_FACE</c> → <c>CHAR_FACE_NUM</c>).</summary>
         public static string NumberLabel(string numberKey) => $"{numberKey}_NUM";
 
+        /// <summary>The creator-thumbnail texture name for an option key
+        /// (<c>CHAR_HAIRSTYLE</c> → <c>CHAR_HAIRSTYLE_ICON</c>).</summary>
+        public static string Icon(string optionKey) => $"{optionKey}_ICON";
+
         /// <summary>The "C{col}R{row}" position-label texture name for a colour key
         /// (<c>CHAR_SKINCOLOR</c> → <c>CHAR_SKINCOLOR_POS</c>).</summary>
         public static string ColorPos(string colorKey) => $"{colorKey}_POS";

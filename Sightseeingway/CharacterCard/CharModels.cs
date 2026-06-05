@@ -34,7 +34,9 @@ namespace Sightseeingway.CharacterCard
         // ---- boolean customize options: published as 0/1 uniforms ----
         IReadOnlyList<CharFlag> Flags,
         // ---- customize colours: resolved RGB, published as [r,g,b] uniforms ----
-        IReadOnlyList<CharColor> Colors)
+        IReadOnlyList<CharColor> Colors,
+        // ---- customize icons: the creator thumbnail per option, published as textures ----
+        IReadOnlyList<CharIcon> Icons)
     {
         /// <summary>
         /// Change key: the full customize array plus the identity fields that aren't in it.
@@ -64,4 +66,10 @@ namespace Sightseeingway.CharacterCard
     /// (so a card can show the "C1R18" the player recognises). Published as an RGB swatch texture,
     /// a "C{Col}R{Row}" position label, and a <c>[Col,Row]</c> cell uniform.</summary>
     public sealed record CharColor(string Key, byte Index, byte R, byte G, byte B, int Col, int Row);
+
+    /// <summary>A customize option's creator thumbnail: the resolved game icon id (0 = none),
+    /// rendered to a texture by the publish worker. The id is resolved on the framework thread
+    /// (it reads Lumina sheets); it's a function of the customize bytes, so it rides the existing
+    /// signature without separate tracking.</summary>
+    public sealed record CharIcon(string Key, uint IconId);
 }

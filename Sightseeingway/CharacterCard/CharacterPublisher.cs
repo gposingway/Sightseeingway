@@ -246,6 +246,11 @@ namespace Sightseeingway.CharacterCard
                 AddCaption(list, col.Key, TextureNaming.DyeNameHeight);
             }
 
+            // Customize thumbnails — the creator icon per option (hairstyle/face-paint/face/…).
+            foreach (var ic in snap.Icons)
+                if (IconTexture.Read(ic.IconId) is { } tex)
+                    list.Add(new PushTexture(ic.Key, tex));
+
             return list;
         }
 

@@ -55,6 +55,18 @@ namespace Sightseeingway.Tests
         public void Captions_UnknownKey_IsNull()
             => Assert.Null(CharCaptions.For("CHAR_NOPE"));
 
+        // ---- icon names ----
+
+        [Theory]
+        [InlineData("CHAR_HAIRSTYLE", "CHAR_HAIRSTYLE_ICON")]
+        [InlineData("CHAR_FACIALFEATURE1", "CHAR_FACIALFEATURE1_ICON")]
+        public void CharNaming_Icon_AppendsIcon(string key, string expected)
+        {
+            Assert.Equal(expected, CharNaming.Icon(key));
+            Assert.True(CharNaming.IsIdentifierSafe(expected));
+            Assert.True(expected.Length <= 64);
+        }
+
         // ---- change signature ----
 
         [Fact]
@@ -85,6 +97,6 @@ namespace Sightseeingway.Tests
             "White Mage", 0u, string.Empty, 0u, 0,
             "Maple Cookies", "WORKS",
             customize,
-            Array.Empty<CharNumber>(), Array.Empty<CharFlag>(), Array.Empty<CharColor>());
+            Array.Empty<CharNumber>(), Array.Empty<CharFlag>(), Array.Empty<CharColor>(), Array.Empty<CharIcon>());
     }
 }

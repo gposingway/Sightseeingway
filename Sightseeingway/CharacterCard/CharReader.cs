@@ -104,13 +104,17 @@ namespace Sightseeingway.CharacterCard
                 // lip colour skipped for Hrothgar, whose slot is a fur pattern, not a colour).
                 var colors = CharColors.Resolve(raw, isHrothgar);
 
+                // Creator thumbnails per option (hairstyle/face-paint/face/tail-ear/facial-features);
+                // resolved here on the framework thread, rendered to textures by the worker.
+                var icons = CharIcons.Resolve(raw);
+
                 return new CharSnapshot(
                     name, homeWorld, currentWorld, dataCenter,
                     raceName, clanName, genderName,
                     jobName, JobIconId: 0u,
                     gcName, GcIconId: 0u, gcRank,
                     fcName, fcTag,
-                    raw, numbers, flags, colors);
+                    raw, numbers, flags, colors, icons);
             }
             catch (Exception ex)
             {
@@ -127,7 +131,7 @@ namespace Sightseeingway.CharacterCard
             string.Empty, 0u, string.Empty, 0u, 0,
             string.Empty, string.Empty,
             new byte[26],
-            Array.Empty<CharNumber>(), Array.Empty<CharFlag>(), Array.Empty<CharColor>());
+            Array.Empty<CharNumber>(), Array.Empty<CharFlag>(), Array.Empty<CharColor>(), Array.Empty<CharIcon>());
 
         private static (string Race, string Clan) ResolveRaceClan(byte race, byte tribe, bool female)
         {
