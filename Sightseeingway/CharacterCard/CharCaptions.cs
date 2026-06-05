@@ -38,9 +38,9 @@ namespace Sightseeingway.CharacterCard
             [P + "JAW"]       = "Jaw",
             [P + "MOUTH"]     = "Mouth",
             [P + "EYESHAPE"]  = "Eye Shape",
-            [P + "TAIL"]      = "Tail / Ears",
+            [P + "TAILEARS"]  = "Tail / Ears",   // fallback; live caption is "Tail Shape" / "Ear Shape"
             [P + "BUST"]      = "Bust",
-            [P + "MUSCLE"]    = "Muscle Tone",
+            [P + "BODYSLIDER"] = "Body",         // fallback; live caption is Muscle Tone / Ear Length / Tail Length
             [P + "HEIGHT"]    = "Height",
             [P + "FACEPAINT"] = "Face Paint",
             [P + "GC_RANK"]   = "GC Rank",

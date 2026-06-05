@@ -50,8 +50,11 @@ namespace Sightseeingway.CharacterCard
     }
 
     /// <summary>A numeric customize option — published as a uniform (the value) and a small
-    /// white-on-transparent number text-texture (<c>&lt;Key&gt;_NUM</c>) so a shader can show it.</summary>
-    public sealed record CharNumber(string Key, int Value);
+    /// white-on-transparent number text-texture (<c>&lt;Key&gt;_NUM</c>) so a shader can show it.
+    /// <paramref name="Caption"/> is the live, race-correct option name from CharaMakeType when
+    /// available (e.g. byte 21 is "Muscle Tone"/"Ear Length"/"Tail Length" per race); null falls
+    /// back to the static caption.</summary>
+    public sealed record CharNumber(string Key, int Value, string? Caption = null);
 
     /// <summary>A boolean customize option, published as a 0/1 uniform.</summary>
     public sealed record CharFlag(string Key, bool On);

@@ -227,7 +227,10 @@ namespace Sightseeingway.CharacterCard
             foreach (var n in snap.Numbers)
             {
                 AddLabel(list, CharNaming.NumberLabel(n.Key), n.Value.ToString(), TextureNaming.DyeNameHeight);
-                AddCaption(list, n.Key, TextureNaming.DyeNameHeight);
+                // Live race-correct caption (CharaMakeType) wins; else the static fallback.
+                var caption = n.Caption ?? CharCaptions.For(n.Key);
+                if (!string.IsNullOrEmpty(caption))
+                    AddLabel(list, CharCaptions.LabelName(n.Key), caption, TextureNaming.DyeNameHeight);
             }
 
             // Toggle options: just the caption — the on/off value is the uniform.

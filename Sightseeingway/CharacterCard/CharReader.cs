@@ -49,45 +49,58 @@ namespace Sightseeingway.CharacterCard
                 var fcTag = Safe(() => player.CompanyTag.TextValue);
                 var fcName = ReadFreeCompanyName();
 
-                // ---- numeric customize options (uniform + number text-texture) ----
-                var numbers = new List<CharNumber>
+                // ---- customize options, gated by per-race/gender availability ----
+                // CharaMakeType tells us which options this race/gender actually has, the slider
+                // max, and the live localized caption — so a male's Bust / an Elezen's muscle slot
+                // never publish, and byte 21 is captioned correctly per race (Muscle Tone /
+                // Ear Length / Tail Length) without special-casing.
+                const string P = CharNaming.Prefix;
+                var avail = CharAvailability.For(c.Tribe, c.Sex);
+                var isHrothgar = c.Race == 7;
+
+                bool Has(int b) => avail.TryGetValue(b, out var info) && info.Available;
+                string? Caption(int b) => avail.TryGetValue(b, out var info) && !string.IsNullOrEmpty(info.Caption) ? info.Caption : null;
+
+                var numbers = new List<CharNumber>();
+                void Num(string key, int value, int b, bool always = false)
                 {
-                    new(CharNaming.Prefix + "FACE",      c.Face),
-                    new(CharNaming.Prefix + "HAIRSTYLE", c.Hairstyle),
-                    new(CharNaming.Prefix + "EYEBROWS",  c.Eyebrows),
-                    new(CharNaming.Prefix + "NOSE",      c.Nose),
-                    new(CharNaming.Prefix + "JAW",       c.Jaw),
-                    new(CharNaming.Prefix + "MOUTH",     c.Mouth),
-                    new(CharNaming.Prefix + "EYESHAPE",  c.EyeShape),
-                    new(CharNaming.Prefix + "TAIL",      c.TailShape),
-                    new(CharNaming.Prefix + "BUST",      c.BustSize),
-                    new(CharNaming.Prefix + "MUSCLE",    c.MuscleMass),
-                    new(CharNaming.Prefix + "HEIGHT",    c.Height),
-                    new(CharNaming.Prefix + "FACEPAINT", c.FacePaint),
-                    new(CharNaming.Prefix + "GC_RANK",   gcRank),
-                };
+                    if (always || Has(b)) numbers.Add(new CharNumber(key, value, Caption(b)));
+                }
+
+                Num(P + "FACE",       c.Face,       5);
+                Num(P + "HAIRSTYLE",  c.Hairstyle,  6,  always: true);
+                Num(P + "EYEBROWS",   c.Eyebrows,   14);
+                Num(P + "EYESHAPE",   c.EyeShape,   16);
+                Num(P + "NOSE",       c.Nose,       17);
+                Num(P + "JAW",        c.Jaw,        18);
+                Num(P + "MOUTH",      c.Mouth,      19);
+                Num(P + "BODYSLIDER", c.MuscleMass, 21, always: true); // muscle / ear-length / tail-length
+                Num(P + "TAILEARS",   c.TailShape,  22);               // tail/ear SHAPE — tailed/eared races only
+                Num(P + "BUST",       c.BustSize,   23);               // female only
+                Num(P + "FACEPAINT",  c.FacePaint,  24);
+                Num(P + "HEIGHT",     c.Height,     3,  always: true);
+                numbers.Add(new CharNumber(P + "GC_RANK", gcRank));    // not a customize option
 
                 // ---- boolean customize options (0/1 uniforms) ----
                 var flags = new List<CharFlag>
                 {
-                    new(CharNaming.Prefix + "HIGHLIGHTS",        c.Highlights),
-                    new(CharNaming.Prefix + "LIPSTICK",          c.Lipstick),
-                    new(CharNaming.Prefix + "SMALLIRIS",         c.SmallIris),
-                    new(CharNaming.Prefix + "FACEPAINTREVERSED", c.FacePaintReversed),
-                    new(CharNaming.Prefix + "LEGACYTATTOO",      c.LegacyTattoo),
-                    new(CharNaming.Prefix + "FACIALFEATURE1",    c.FacialFeature1),
-                    new(CharNaming.Prefix + "FACIALFEATURE2",    c.FacialFeature2),
-                    new(CharNaming.Prefix + "FACIALFEATURE3",    c.FacialFeature3),
-                    new(CharNaming.Prefix + "FACIALFEATURE4",    c.FacialFeature4),
-                    new(CharNaming.Prefix + "FACIALFEATURE5",    c.FacialFeature5),
-                    new(CharNaming.Prefix + "FACIALFEATURE6",    c.FacialFeature6),
-                    new(CharNaming.Prefix + "FACIALFEATURE7",    c.FacialFeature7),
+                    new(P + "HIGHLIGHTS",     c.Highlights),
+                    new(P + "SMALLIRIS",      c.SmallIris),
+                    new(P + "LEGACYTATTOO",   c.LegacyTattoo),
+                    new(P + "FACIALFEATURE1", c.FacialFeature1),
+                    new(P + "FACIALFEATURE2", c.FacialFeature2),
+                    new(P + "FACIALFEATURE3", c.FacialFeature3),
+                    new(P + "FACIALFEATURE4", c.FacialFeature4),
+                    new(P + "FACIALFEATURE5", c.FacialFeature5),
+                    new(P + "FACIALFEATURE6", c.FacialFeature6),
+                    new(P + "FACIALFEATURE7", c.FacialFeature7),
                 };
+                if (!isHrothgar) flags.Add(new CharFlag(P + "LIPSTICK", c.Lipstick));          // Hrothgar: no lipstick
+                if (Has(24)) flags.Add(new CharFlag(P + "FACEPAINTREVERSED", c.FacePaintReversed));
 
-                // Customize colours resolved from the human.cmp palette (skipped gracefully if the
-                // cmp is unavailable). Resolved here on the framework thread so the worker never
-                // touches game files; the snapshot carries the RGB + grid position.
-                var colors = CharColors.Resolve(raw);
+                // Customize colours from the human.cmp palette (resolved on the framework thread;
+                // lip colour skipped for Hrothgar, whose slot is a fur pattern, not a colour).
+                var colors = CharColors.Resolve(raw, isHrothgar);
 
                 return new CharSnapshot(
                     name, homeWorld, currentWorld, dataCenter,

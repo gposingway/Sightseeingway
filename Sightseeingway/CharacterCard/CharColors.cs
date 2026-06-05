@@ -40,7 +40,7 @@ namespace Sightseeingway.CharacterCard
 
         /// <summary>Resolves all customize colours from the raw 26-byte array. Empty if the cmp
         /// palette is unavailable (the rest of the character card still publishes).</summary>
-        public static IReadOnlyList<CharColor> Resolve(byte[] c)
+        public static IReadOnlyList<CharColor> Resolve(byte[] c, bool skipLip = false)
         {
             var cmp = Cmp();
             if (cmp.Length == 0 || c.Length < 26) return Array.Empty<CharColor>();
@@ -58,7 +58,8 @@ namespace Sightseeingway.CharacterCard
             AddStandard(list, cmp, CharNaming.Prefix + "TATTOOCOLOR",     c[13], 0);
             AddStandard(list, cmp, CharNaming.Prefix + "EYECOLORL",       c[15], 0);
             // Remapped pickers — Dark (bytes 0–95) ++ Light (bytes 128–223).
-            AddRemapped(list, cmp, CharNaming.Prefix + "LIPCOLOR",        c[20], 512,  1024);
+            if (!skipLip)
+                AddRemapped(list, cmp, CharNaming.Prefix + "LIPCOLOR",   c[20], 512,  1024);
             AddRemapped(list, cmp, CharNaming.Prefix + "FACEPAINTCOLOR",  c[25], 640,  1152);
             return list;
         }
