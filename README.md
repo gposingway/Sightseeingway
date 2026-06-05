@@ -128,7 +128,7 @@ It is **glamour-aware** — it shows what's actually rendered (the glamoured app
 For each visible slot the plugin publishes:
 
 *   the item **icon** (native resolution),
-*   the item **name** as a white-on-transparent label in four bundled fonts (Inter, Cinzel, EB Garamond, Cormorant),
+*   the item **name** as a white-on-transparent label in four bundled fonts (Inter, Cinzel, Tangerine, Cormorant),
 *   a **rarity** colour swatch (the in-game name colour),
 *   both **dye** colours and their **names**,
 *   the item **category**, a **level** line (*Lv. / Ilvl*), and a **Unique** tag where it applies.

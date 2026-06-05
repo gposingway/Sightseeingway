@@ -30,10 +30,10 @@ namespace Sightseeingway.Gear
 
         /// <summary>
         /// Fonts for name-label variants, in index order — the index is the bus-name
-        /// token (NAME0..3). 0 = Inter (sans), 1 = Cinzel (epic caps), 2 = EB Garamond
-        /// (serif), 3 = Cormorant (glamour serif). Must match <see cref="GlamFonts"/>.
+        /// token (NAME0..3). 0 = Inter (sans), 1 = Cinzel (epic caps), 2 = Tangerine
+        /// (script), 3 = Cormorant (glamour serif). Must match <see cref="GlamFonts"/>.
         /// </summary>
-        public static readonly string[] NameFontKeys = { "INTER", "CINZEL", "GARAMOND", "CORMORANT" };
+        public static readonly string[] NameFontKeys = { "INTER", "CINZEL", "TANGERINE", "CORMORANT" };
 
         /// <summary>Render height (px) for item-name labels (supersampled by the shader).</summary>
         public const int NameHeight = 128;

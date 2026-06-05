@@ -16,7 +16,7 @@ namespace Sightseeingway.Gear
         {
             ["INTER"]     = "Inter.ttf",
             ["CINZEL"]    = "Cinzel.ttf",
-            ["GARAMOND"]  = "EBGaramond.ttf",
+            ["TANGERINE"] = "Tangerine.ttf",
             ["CORMORANT"] = "Cormorant.ttf",
         };
 
