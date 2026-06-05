@@ -62,9 +62,9 @@ namespace Sightseeingway.CharacterCard
                 string? Caption(int b) => avail.TryGetValue(b, out var info) && !string.IsNullOrEmpty(info.Caption) ? info.Caption : null;
 
                 var numbers = new List<CharNumber>();
-                void Num(string key, int value, int b, bool always = false)
+                void Num(string key, int value, int b, bool always = false, string? fallback = null)
                 {
-                    if (always || Has(b)) numbers.Add(new CharNumber(key, value, Caption(b)));
+                    if (always || Has(b)) numbers.Add(new CharNumber(key, value, Caption(b) ?? fallback));
                 }
 
                 Num(P + "FACE",       c.Face,       5);
@@ -74,8 +74,10 @@ namespace Sightseeingway.CharacterCard
                 Num(P + "NOSE",       c.Nose,       17);
                 Num(P + "JAW",        c.Jaw,        18);
                 Num(P + "MOUTH",      c.Mouth,      19);
-                Num(P + "BODYSLIDER", c.MuscleMass, 21, always: true); // muscle / ear-length / tail-length
-                Num(P + "TAILEARS",   c.TailShape,  22);               // tail/ear SHAPE — tailed/eared races only
+                // byte 21/22 are relabelled per race — pass a per-race fallback so the caption is
+                // never the generic combined form even if the live CharaMakeType read comes back empty.
+                Num(P + "BODYSLIDER", c.MuscleMass, 21, always: true, fallback: BodySliderName(c.Race));
+                Num(P + "TAILEARS",   c.TailShape,  22, fallback: TailEarName(c.Race));
                 Num(P + "BUST",       c.BustSize,   23);               // female only
                 Num(P + "FACEPAINT",  c.FacePaint,  24);
                 Num(P + "HEIGHT",     c.Height,     3,  always: true);
@@ -201,6 +203,26 @@ namespace Sightseeingway.CharacterCard
                 return string.Empty;
             }
         }
+
+        // Per-race fallback captions for the two relabelled body sliders — used only when the live
+        // CharaMakeType caption is unavailable, so the label is still per-character (never the
+        // generic combined "Tail / Ears"). Race ids (customize byte 0, = Race sheet RowId):
+        // 1 Hyur · 2 Elezen · 3 Lalafell · 4 Miqo'te · 5 Roegadyn · 6 Au Ra · 7 Hrothgar · 8 Viera.
+        // Groups: muscular Hyur/Roegadyn · tailed Miqo'te/Au Ra/Hrothgar · eared Elezen/Lalafell/Viera.
+        private static string BodySliderName(byte race) => race switch  // byte 21
+        {
+            1 or 5      => "Muscle Tone",
+            4 or 6 or 7 => "Tail Length",
+            2 or 3 or 8 => "Ear Length",
+            _           => "Body",
+        };
+
+        private static string TailEarName(byte race) => race switch     // byte 22 (eared/tailed only)
+        {
+            4 or 6 or 7 => "Tail Shape",
+            2 or 3 or 8 => "Ear Shape",
+            _           => "Tail / Ears",
+        };
 
         private static string Safe(Func<string> read)
         {
