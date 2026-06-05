@@ -209,22 +209,46 @@ namespace Sightseeingway.CharacterCard
                     && NameTexture.Render(snap.Name, font, TextureNaming.NameHeight) is { } tex)
                     list.Add(new PushTexture(CharNaming.Name(i), tex));
 
-            // Identity labels (single Inter, 128px). Empty ones are omitted (so they get cleaned up).
-            AddLabel(list, CharNaming.World, snap.HomeWorld, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.CurrentWorld, snap.CurrentWorld, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.DataCenter, snap.DataCenter, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.Race, snap.RaceName, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.Clan, snap.ClanName, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.Gender, snap.GenderName, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.Job, snap.JobName, TextureNaming.NameHeight);
-            AddLabel(list, CharNaming.GcName, snap.GcName, TextureNaming.NameHeight);
+            // Identity: the value label (CHAR_RACE = "Hyur") + its caption (CHAR_RACE_LABEL =
+            // "Race"), both 128px. Empty fields are omitted entirely (so they get cleaned up).
+            AddLabeled(list, CharNaming.World, snap.HomeWorld);
+            AddLabeled(list, CharNaming.CurrentWorld, snap.CurrentWorld);
+            AddLabeled(list, CharNaming.DataCenter, snap.DataCenter);
+            AddLabeled(list, CharNaming.Race, snap.RaceName);
+            AddLabeled(list, CharNaming.Clan, snap.ClanName);
+            AddLabeled(list, CharNaming.Gender, snap.GenderName);
+            AddLabeled(list, CharNaming.Job, snap.JobName);
+            AddLabeled(list, CharNaming.GcName, snap.GcName);
 
-            // A small "<KEY>_NUM" number label per numeric option (28px Inter), so a shader can
-            // SHOW the value (the uniform drives a slider; this shows the number).
+            // Numeric options: a small "<KEY>_NUM" value label + the "<KEY>_LABEL" caption (both
+            // 28px), so a card can render "Face  3". The value also rides a uniform (slider/needle).
             foreach (var n in snap.Numbers)
+            {
                 AddLabel(list, CharNaming.NumberLabel(n.Key), n.Value.ToString(), TextureNaming.DyeNameHeight);
+                AddCaption(list, n.Key, TextureNaming.DyeNameHeight);
+            }
+
+            // Toggle options: just the caption — the on/off value is the uniform.
+            foreach (var f in snap.Flags)
+                AddCaption(list, f.Key, TextureNaming.DyeNameHeight);
 
             return list;
+        }
+
+        /// <summary>Stages a value label plus its static option-name caption, both at 128px.</summary>
+        private static void AddLabeled(List<PushTexture> list, string key, string value)
+        {
+            if (string.IsNullOrEmpty(value)) return; // no value → no row and no caption
+            AddLabel(list, key, value, TextureNaming.NameHeight);
+            AddCaption(list, key, TextureNaming.NameHeight);
+        }
+
+        /// <summary>Stages the <c>&lt;KEY&gt;_LABEL</c> caption text-texture for an option key
+        /// (CHAR_FACE → "Face"), so a shader can show "caption: value" without rendering text.</summary>
+        private static void AddCaption(List<PushTexture> list, string optionKey, int heightPx)
+        {
+            if (CharCaptions.For(optionKey) is { } caption)
+                AddLabel(list, CharCaptions.LabelName(optionKey), caption, heightPx);
         }
 
         private static void AddLabel(List<PushTexture> list, string name, string text, int heightPx)

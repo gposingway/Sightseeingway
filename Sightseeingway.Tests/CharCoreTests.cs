@@ -26,6 +26,35 @@ namespace Sightseeingway.Tests
         public void CharNaming_Keys_AreIdentifierSafe(string key)
             => Assert.True(CharNaming.IsIdentifierSafe(key));
 
+        // ---- option-name captions ----
+
+        [Theory]
+        [InlineData("CHAR_FACE", "Face")]
+        [InlineData("CHAR_HAIRSTYLE", "Hairstyle")]
+        [InlineData("CHAR_FACIALFEATURE7", "Facial Feature 7")]
+        [InlineData("CHAR_GC_RANK", "GC Rank")]
+        [InlineData("CHAR_RACE", "Race")]
+        public void Captions_CoverKnownKeys(string key, string caption)
+        {
+            Assert.Equal(caption, CharCaptions.For(key));
+            Assert.Equal($"{key}_LABEL", CharCaptions.LabelName(key));
+        }
+
+        [Fact]
+        public void Captions_AllLabelNamesAreIdentifierSafe()
+        {
+            foreach (var key in CharCaptions.Names.Keys)
+            {
+                var label = CharCaptions.LabelName(key);
+                Assert.True(CharNaming.IsIdentifierSafe(label), label);
+                Assert.True(label.Length <= 64);
+            }
+        }
+
+        [Fact]
+        public void Captions_UnknownKey_IsNull()
+            => Assert.Null(CharCaptions.For("CHAR_NOPE"));
+
         // ---- change signature ----
 
         [Fact]
