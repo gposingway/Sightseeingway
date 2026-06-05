@@ -36,7 +36,9 @@ namespace Sightseeingway.CharacterCard
         // ---- customize colours: resolved RGB, published as [r,g,b] uniforms ----
         IReadOnlyList<CharColor> Colors,
         // ---- customize icons: the creator thumbnail per option, published as textures ----
-        IReadOnlyList<CharIcon> Icons)
+        IReadOnlyList<CharIcon> Icons,
+        // ---- resolved text labels (e.g. an unlockable hairstyle's unlock-item name) ----
+        IReadOnlyList<CharLabel> Labels)
     {
         /// <summary>
         /// Change key: the full customize array plus the identity fields that aren't in it.
@@ -72,4 +74,9 @@ namespace Sightseeingway.CharacterCard
     /// (it reads Lumina sheets); it's a function of the customize bytes, so it rides the existing
     /// signature without separate tracking.</summary>
     public sealed record CharIcon(string Key, uint IconId);
+
+    /// <summary>A resolved text label for a customize option — e.g. the unlock-item name of an
+    /// unlockable hairstyle/face-paint (the only "name" the game data carries; default styles have
+    /// none). Published as a white-on-transparent text texture, like the identity labels.</summary>
+    public sealed record CharLabel(string Key, string Text);
 }

@@ -39,6 +39,10 @@ namespace Sightseeingway.CharacterCard
         /// (<c>CHAR_HAIRSTYLE</c> → <c>CHAR_HAIRSTYLE_ICON</c>).</summary>
         public static string Icon(string optionKey) => $"{optionKey}_ICON";
 
+        /// <summary>The resolved-name texture name for an option key
+        /// (<c>CHAR_HAIRSTYLE</c> → <c>CHAR_HAIRSTYLE_NAME</c>).</summary>
+        public static string OptionName(string optionKey) => $"{optionKey}_NAME";
+
         /// <summary>The "C{col}R{row}" position-label texture name for a colour key
         /// (<c>CHAR_SKINCOLOR</c> → <c>CHAR_SKINCOLOR_POS</c>).</summary>
         public static string ColorPos(string colorKey) => $"{colorKey}_POS";

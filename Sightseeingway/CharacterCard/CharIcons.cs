@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Dalamud.Game;
+using Dalamud.Utility;
 using Lumina.Excel;
 using Lumina.Excel.Sheets;
 
@@ -21,19 +22,25 @@ namespace Sightseeingway.CharacterCard
     {
         private const uint LegacyTattooIcon = 137905; // fixed; not in any sheet (Glamourer SetFacialFeatures)
 
-        public static IReadOnlyList<CharIcon> Resolve(byte[] c)
+        /// <summary>Resolved icons plus any resolved text labels (unlock-item names).</summary>
+        public sealed record Result(IReadOnlyList<CharIcon> Icons, IReadOnlyList<CharLabel> Labels);
+
+        private static readonly Result Empty = new(Array.Empty<CharIcon>(), Array.Empty<CharLabel>());
+
+        public static Result Resolve(byte[] c)
         {
+            if (c.Length < 26) return Empty;
             var list = new List<CharIcon>();
-            if (c.Length < 26) return list;
+            var labels = new List<CharLabel>();
 
             try
             {
                 byte race = c[0], sex = c[1], tribe = c[4];
-                if (tribe == 0) return list;
+                if (tribe == 0) return Empty;
 
                 var charaMake = Plugin.DataManager.GetExcelSheet<CharaMakeType>();
                 var custom = Plugin.DataManager.GetExcelSheet<CharaMakeCustomize>();
-                if (custom == null) return list;
+                if (custom == null) return Empty;
 
                 const string P = CharNaming.Prefix;
                 var rowId = (uint)((tribe - 1) * 2 + (sex != 0 ? 1 : 0));
@@ -72,8 +79,8 @@ namespace Sightseeingway.CharacterCard
                 {
                     var hmt = hairSheet.GetRow(rowId);
                     if (race != 7) // Hrothgar hair is per-face (HairByFace) — defer to v2
-                        Add(list, P + "HAIRSTYLE", IconForValue(RawEntries(hmt, custom, 30, 66), c[6]));
-                    Add(list, P + "FACEPAINT", IconForValue(RawEntries(hmt, custom, 37, 73), (byte)(c[24] & 0x7F)));
+                        AddIconAndName(list, labels, P + "HAIRSTYLE", RawMatch(hmt, custom, 30, 66, c[6]));
+                    AddIconAndName(list, labels, P + "FACEPAINT", RawMatch(hmt, custom, 37, 73, (byte)(c[24] & 0x7F)));
                 }
 
                 // LEGACY TATTOO — fixed icon (toggle published separately).
@@ -84,7 +91,7 @@ namespace Sightseeingway.CharacterCard
                 Plugin.Logger?.Debug($"Icon resolve failed: {ex.Message}");
             }
 
-            return list;
+            return new Result(list, labels);
         }
 
         // (value, icon) entries for a typed CharaMakeStruct menu (Face, Tail/Ear).
@@ -109,20 +116,25 @@ namespace Sightseeingway.CharacterCard
             return entries;
         }
 
-        // (value, icon) entries for a HairMakeType raw row: countCol holds the entry count, entries
-        // start at startCol with a stride of 9 (a CharaMakeCustomize row id, or uint.MaxValue = none).
-        private static List<(byte Value, uint Icon)> RawEntries(RawRow hmt, ExcelSheet<CharaMakeCustomize> custom, int countCol, int startCol)
+        // (icon, unlock-item name) for the player's hair/paint value from a HairMakeType raw row:
+        // countCol holds the entry count, entries start at startCol with a stride of 9 (a
+        // CharaMakeCustomize row id, or uint.MaxValue = none). Matched on FeatureID; the matched
+        // row's HintItem (an unlock Item) supplies the only human name the data carries — empty
+        // for default styles and quest unlocks.
+        private static (uint Icon, string Name) RawMatch(RawRow hmt, ExcelSheet<CharaMakeCustomize> custom, int countCol, int startCol, byte playerByte)
         {
-            var entries = new List<(byte, uint)>();
             int n = hmt.ReadUInt8Column(countCol);
             for (var i = 0; i < n; i++)
             {
                 var idx = hmt.ReadUInt32Column(startCol + i * 9);
                 if (idx == uint.MaxValue || idx == 0) continue;
-                if (custom.TryGetRow(idx, out var cmc))
-                    entries.Add((cmc.FeatureID, cmc.Icon)); // unlockables not in the sheet → skipped
+                if (custom.TryGetRow(idx, out var cmc) && cmc.FeatureID == playerByte)
+                {
+                    var name = cmc.HintItem.ValueNullable is { } item ? item.Name.ExtractText() : string.Empty;
+                    return (cmc.Icon, name);
+                }
             }
-            return entries;
+            return (0, string.Empty);
         }
 
         private static uint IconForValue(List<(byte Value, uint Icon)> entries, byte playerByte)
@@ -142,6 +154,12 @@ namespace Sightseeingway.CharacterCard
         private static void Add(List<CharIcon> list, string optionKey, uint iconId)
         {
             if (iconId != 0) list.Add(new CharIcon(CharNaming.Icon(optionKey), iconId));
+        }
+
+        private static void AddIconAndName(List<CharIcon> icons, List<CharLabel> labels, string optionKey, (uint Icon, string Name) match)
+        {
+            if (match.Icon != 0) icons.Add(new CharIcon(CharNaming.Icon(optionKey), match.Icon));
+            if (!string.IsNullOrEmpty(match.Name)) labels.Add(new CharLabel(CharNaming.OptionName(optionKey), match.Name));
         }
     }
 }

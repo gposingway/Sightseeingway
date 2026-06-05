@@ -251,6 +251,10 @@ namespace Sightseeingway.CharacterCard
                 if (IconTexture.Read(ic.IconId) is { } tex)
                     list.Add(new PushTexture(ic.Key, tex));
 
+            // Resolved names (e.g. an unlockable style's unlock-item name), as text textures.
+            foreach (var lbl in snap.Labels)
+                AddLabel(list, lbl.Key, lbl.Text, TextureNaming.NameHeight);
+
             return list;
         }
 
