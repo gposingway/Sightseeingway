@@ -25,6 +25,8 @@ namespace Sightseeingway.CharacterCard
         string GcName,
         uint GcIconId,
         int GcRank,
+        string FcName,
+        string FcTag,
         // ---- raw 26-byte customize array (drives the change signature) ----
         byte[] Customize,
         // ---- numeric customize options: a uniform (the value) + a "<KEY>_NUM" number label ----
@@ -43,7 +45,8 @@ namespace Sightseeingway.CharacterCard
                 Convert.ToBase64String(Customize),
                 Name, HomeWorld, CurrentWorld, DataCenter,
                 JobName, JobIconId.ToString(),
-                GcName, GcIconId.ToString(), GcRank.ToString());
+                GcName, GcIconId.ToString(), GcRank.ToString(),
+                FcName, FcTag);
     }
 
     /// <summary>A numeric customize option — published as a uniform (the value) and a small

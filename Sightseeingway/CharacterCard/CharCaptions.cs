@@ -27,6 +27,8 @@ namespace Sightseeingway.CharacterCard
             [CharNaming.Gender]       = "Gender",
             [CharNaming.Job]          = "Job",
             [CharNaming.GcName]       = "Grand Company",
+            [CharNaming.FcName]       = "Free Company",
+            [CharNaming.FcTag]        = "FC Tag",
 
             // numeric options
             [P + "FACE"]      = "Face",

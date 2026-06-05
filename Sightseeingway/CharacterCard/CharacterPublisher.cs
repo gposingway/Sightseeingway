@@ -219,6 +219,8 @@ namespace Sightseeingway.CharacterCard
             AddLabeled(list, CharNaming.Gender, snap.GenderName);
             AddLabeled(list, CharNaming.Job, snap.JobName);
             AddLabeled(list, CharNaming.GcName, snap.GcName);
+            AddLabeled(list, CharNaming.FcName, snap.FcName);
+            AddLabeled(list, CharNaming.FcTag, snap.FcTag);
 
             // Numeric options: a small "<KEY>_NUM" value label + the "<KEY>_LABEL" caption (both
             // 28px), so a card can render "Face  3". The value also rides a uniform (slider/needle).

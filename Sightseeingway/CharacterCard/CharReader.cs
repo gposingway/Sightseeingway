@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Dalamud.Utility;
 using FFXIVClientStructs.FFXIV.Client.Game.Character;
 using FFXIVClientStructs.FFXIV.Client.Game.UI;
+using FFXIVClientStructs.FFXIV.Client.UI.Info;
 using Lumina.Excel.Sheets;
 
 namespace Sightseeingway.CharacterCard
@@ -45,6 +46,8 @@ namespace Sightseeingway.CharacterCard
                 var genderName = female ? "Female" : "Male";
 
                 var (gcName, gcRank) = ReadGrandCompany();
+                var fcTag = Safe(() => player.CompanyTag.TextValue);
+                var fcName = ReadFreeCompanyName();
 
                 // ---- numeric customize options (uniform + number text-texture) ----
                 var numbers = new List<CharNumber>
@@ -91,6 +94,7 @@ namespace Sightseeingway.CharacterCard
                     raceName, clanName, genderName,
                     jobName, JobIconId: 0u,
                     gcName, GcIconId: 0u, gcRank,
+                    fcName, fcTag,
                     raw, numbers, flags, colors);
             }
             catch (Exception ex)
@@ -106,6 +110,7 @@ namespace Sightseeingway.CharacterCard
             string.Empty, string.Empty, string.Empty, string.Empty,
             string.Empty, string.Empty, string.Empty,
             string.Empty, 0u, string.Empty, 0u, 0,
+            string.Empty, string.Empty,
             new byte[26],
             Array.Empty<CharNumber>(), Array.Empty<CharFlag>(), Array.Empty<CharColor>());
 
@@ -165,6 +170,22 @@ namespace Sightseeingway.CharacterCard
             {
                 Plugin.Logger?.Debug($"Grand Company read failed: {ex.Message}");
                 return (string.Empty, 0);
+            }
+        }
+
+        // The full Free Company name from the FC info proxy (populated for FC members). The short
+        // tag comes from the player's CompanyTag; the proxy carries the full name.
+        private static unsafe string ReadFreeCompanyName()
+        {
+            try
+            {
+                var fc = InfoProxyFreeCompany.Instance();
+                return fc != null ? fc->NameString ?? string.Empty : string.Empty;
+            }
+            catch (Exception ex)
+            {
+                Plugin.Logger?.Debug($"FC name read failed: {ex.Message}");
+                return string.Empty;
             }
         }
 

@@ -20,6 +20,8 @@ namespace Sightseeingway.CharacterCard
         public const string Gender       = Prefix + "GENDER";
         public const string Job          = Prefix + "JOB";
         public const string GcName       = Prefix + "GC_NAME";
+        public const string FcName       = Prefix + "FC_NAME";
+        public const string FcTag        = Prefix + "FC_TAG";
 
         // ---- icons (standard game icons via IconTexture) ----
         public const string JobIcon = Prefix + "JOB_ICON";

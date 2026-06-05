@@ -83,6 +83,7 @@ namespace Sightseeingway.Tests
             "Wol", "Sargatanas", "Sargatanas", "Aether",
             "Hyur", "Midlander", "Female",
             "White Mage", 0u, string.Empty, 0u, 0,
+            "Maple Cookies", "WORKS",
             customize,
             Array.Empty<CharNumber>(), Array.Empty<CharFlag>(), Array.Empty<CharColor>());
     }
