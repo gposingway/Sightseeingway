@@ -33,6 +33,14 @@ namespace Sightseeingway.CharacterCard
         /// (e.g. <c>CHAR_FACE</c> → <c>CHAR_FACE_NUM</c>).</summary>
         public static string NumberLabel(string numberKey) => $"{numberKey}_NUM";
 
+        /// <summary>The "C{col}R{row}" position-label texture name for a colour key
+        /// (<c>CHAR_SKINCOLOR</c> → <c>CHAR_SKINCOLOR_POS</c>).</summary>
+        public static string ColorPos(string colorKey) => $"{colorKey}_POS";
+
+        /// <summary>The grid-cell uniform key for a colour (<c>CHAR_SKINCOLOR</c> →
+        /// <c>CHAR_SKINCOLOR_CELL</c>), carrying <c>[col, row]</c>.</summary>
+        public static string ColorCell(string colorKey) => $"{colorKey}_CELL";
+
         /// <summary>Shadingway requires identifier-safe names; reuse the gear validator.</summary>
         public static bool IsIdentifierSafe(string name) => TextureNaming.IsIdentifierSafe(name);
     }

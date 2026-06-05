@@ -56,6 +56,16 @@ namespace Sightseeingway.CharacterCard
             [P + "FACIALFEATURE5"]    = "Facial Feature 5",
             [P + "FACIALFEATURE6"]    = "Facial Feature 6",
             [P + "FACIALFEATURE7"]    = "Facial Feature 7",
+
+            // customize colours
+            [P + "SKINCOLOR"]       = "Skin Color",
+            [P + "EYECOLORR"]       = "Right Eye",
+            [P + "HAIRCOLOR"]       = "Hair Color",
+            [P + "HIGHLIGHTSCOLOR"] = "Highlights Color",
+            [P + "TATTOOCOLOR"]     = "Feature Color",
+            [P + "EYECOLORL"]       = "Left Eye",
+            [P + "LIPCOLOR"]        = "Lip Color",
+            [P + "FACEPAINTCOLOR"]  = "Face Paint Color",
         };
 
         /// <summary>The caption text for a field's bus key, or null if none.</summary>

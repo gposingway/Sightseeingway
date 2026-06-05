@@ -81,9 +81,10 @@ namespace Sightseeingway.CharacterCard
                     new(CharNaming.Prefix + "FACIALFEATURE7",    c.FacialFeature7),
                 };
 
-                // Colours (skin/hair/eyes/lip/…) come in a follow-up once the human.cmp byte-order
-                // is confirmed in-game; until then publish an empty colour set (graceful no-op).
-                var colors = Array.Empty<CharColor>();
+                // Customize colours resolved from the human.cmp palette (skipped gracefully if the
+                // cmp is unavailable). Resolved here on the framework thread so the worker never
+                // touches game files; the snapshot carries the RGB + grid position.
+                var colors = CharColors.Resolve(raw);
 
                 return new CharSnapshot(
                     name, homeWorld, currentWorld, dataCenter,

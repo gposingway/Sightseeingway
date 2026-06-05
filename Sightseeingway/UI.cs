@@ -83,7 +83,6 @@ namespace Sightseeingway
                 GearPublishEnabled = config.GearPublishEnabled,
                 GearShadingwayPort = config.GearShadingwayPort,
                 CharacterPublishEnabled = config.CharacterPublishEnabled,
-                CharacterColorsEnabled = config.CharacterColorsEnabled,
             };
         }
 
@@ -346,7 +345,6 @@ namespace Sightseeingway
 
             var charWasEnabled = config.CharacterPublishEnabled;
             config.CharacterPublishEnabled = tempConfig.CharacterPublishEnabled;
-            config.CharacterColorsEnabled = tempConfig.CharacterColorsEnabled;
             if (charWasEnabled && !config.CharacterPublishEnabled)
                 _ = Plugin.CharacterPublisher?.FlushAsync();
         }
@@ -360,8 +358,7 @@ namespace Sightseeingway
             tempConfig.LogVerbosity = LogVerbosity.Status;
             tempConfig.GearPublishEnabled = true;
             tempConfig.GearShadingwayPort = 48756;
-            tempConfig.CharacterPublishEnabled = false;
-            tempConfig.CharacterColorsEnabled = false;
+            tempConfig.CharacterPublishEnabled = true;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
         }
 

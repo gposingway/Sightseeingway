@@ -232,8 +232,21 @@ namespace Sightseeingway.CharacterCard
             foreach (var f in snap.Flags)
                 AddCaption(list, f.Key, TextureNaming.DyeNameHeight);
 
+            // Customize colours: an 8×8 RGB swatch (fill/sample) + a "C1R18" grid-position label
+            // (what the player picked) + the caption. The cell [col,row] also rides a uniform.
+            foreach (var col in snap.Colors)
+            {
+                list.Add(new PushTexture(col.Key, Swatch(col.R, col.G, col.B)));
+                AddLabel(list, CharNaming.ColorPos(col.Key), $"C{col.Col}R{col.Row}", TextureNaming.DyeNameHeight);
+                AddCaption(list, col.Key, TextureNaming.DyeNameHeight);
+            }
+
             return list;
         }
+
+        private static RawTexture Swatch(byte r, byte g, byte b)
+            => new("rgba8", SwatchFactory.SwatchSize, SwatchFactory.SwatchSize,
+                SwatchFactory.SolidRgba(SwatchFactory.SwatchSize, SwatchFactory.SwatchSize, r, g, b));
 
         /// <summary>Stages a value label plus its static option-name caption, both at 128px.</summary>
         private static void AddLabeled(List<PushTexture> list, string key, string value)
@@ -261,10 +274,10 @@ namespace Sightseeingway.CharacterCard
 
         private static List<(string Name, float[] Values)> BuildUniforms(CharSnapshot snap)
         {
-            var list = new List<(string, float[])>(snap.Numbers.Count + snap.Flags.Count);
+            var list = new List<(string, float[])>(snap.Numbers.Count + snap.Flags.Count + snap.Colors.Count);
             foreach (var n in snap.Numbers) list.Add((n.Key, new[] { (float)n.Value }));
             foreach (var f in snap.Flags) list.Add((f.Key, new[] { f.On ? 1f : 0f }));
-            // Colours (swatch textures + position labels + cell uniforms) come in the colour phase.
+            foreach (var col in snap.Colors) list.Add((CharNaming.ColorCell(col.Key), new[] { (float)col.Col, col.Row }));
             return list;
         }
 

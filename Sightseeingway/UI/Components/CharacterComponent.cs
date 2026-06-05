@@ -25,9 +25,9 @@ namespace Sightseeingway.UI.Components
             ImGui.TextColored(Constants.UI.FieldHeaderColor, "Character → Shadingway (identity + appearance)");
             ImGui.TextWrapped(
                 "Publishes your character — name, world, race/clan/gender, job, and the customize " +
-                "sliders (and, optionally, colours) — as CHAR_* textures and uniforms, so ReShade " +
-                "shaders and presets can compose a character card. Static: it updates only when " +
-                "your appearance changes.");
+                "sliders and colours — as CHAR_* textures and uniforms, so ReShade shaders and " +
+                "presets can compose a character card. On by default; updates only when your " +
+                "appearance changes.");
             ImGui.Spacing();
 
             var enabled = tempConfig.CharacterPublishEnabled;
@@ -36,19 +36,13 @@ namespace Sightseeingway.UI.Components
                 tempConfig.CharacterPublishEnabled = enabled;
                 changed = true;
             }
-
-            ImGui.BeginDisabled(!enabled);
-            var colors = tempConfig.CharacterColorsEnabled;
-            if (ImGui.Checkbox("Also publish customize colours (larger set)", ref colors))
-            {
-                tempConfig.CharacterColorsEnabled = colors;
-                changed = true;
-            }
-            ImGui.EndDisabled();
             ImGui.SameLine();
             ImGui.TextColored(Constants.UI.InfoColor, "(?)");
             if (ImGui.IsItemHovered())
-                ImGui.SetTooltip("Adds an RGB swatch + a \"C1R18\" grid-position label per customize\ncolour (skin/hair/eyes/lip/…). More resident textures; off by default.");
+                ImGui.SetTooltip(
+                    "Requires the Shadingway ReShade addon running in this game client.\n" +
+                    "On by default; takes effect on Save. Publishes identity, the customize\n" +
+                    "sliders + colours, and their captions as CHAR_* textures and uniforms.");
 
             ImGui.Spacing();
             ImGui.Separator();

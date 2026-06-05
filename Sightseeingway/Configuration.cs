@@ -10,7 +10,7 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public const int CurrentVersion = 8;
+        public const int CurrentVersion = 9;
 
         public int Version { get; set; } = CurrentVersion;
 
@@ -65,18 +65,12 @@ namespace Sightseeingway
         // --- v1.5 additions: Character publishing (identity + appearance → Shadingway) ---
 
         /// <summary>
-        /// Push the local character's identity + appearance (CHAR_* textures/uniforms) to
-        /// Shadingway. Off by default for the first release — the set is large and a couple of
-        /// colour details want an in-game pass — toggle in the Character tab. Reuses
-        /// <see cref="GearShadingwayPort"/> (same bus/port).
+        /// Push the local character's identity + appearance (CHAR_* textures/uniforms, including
+        /// customize colours) to Shadingway. On by default — like gear, it "just works" when
+        /// Shadingway is running and degrades silently otherwise. Reuses
+        /// <see cref="GearShadingwayPort"/> (same bus/port). Toggle in the Character tab.
         /// </summary>
-        public bool CharacterPublishEnabled { get; set; } = false;
-
-        /// <summary>
-        /// Also publish the customize colour swatches + grid-position labels (a noticeably larger
-        /// resident set). Off by default; enable under the Character tab.
-        /// </summary>
-        public bool CharacterColorsEnabled { get; set; } = false;
+        public bool CharacterPublishEnabled { get; set; } = true;
 
         // --- Deprecated (kept for one version cycle for cross-version safety) ---
 
@@ -149,11 +143,18 @@ namespace Sightseeingway
                 Version = 7;
             }
 
-            // v8 added Character publishing fields; their initializers (off by default) supply
-            // safe values when absent from an older config, so the bump just records the version.
+            // v8 added Character publishing fields.
             if (Version < 8)
             {
                 Version = 8;
+            }
+
+            // v9: Character publishing is now on by default ("just works" like gear). Enable it
+            // once for existing configs; a later explicit opt-out sticks (this runs only < 9).
+            if (Version < 9)
+            {
+                CharacterPublishEnabled = true;
+                Version = 9;
             }
 #pragma warning restore CS0618
         }

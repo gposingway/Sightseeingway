@@ -53,7 +53,9 @@ namespace Sightseeingway.CharacterCard
     /// <summary>A boolean customize option, published as a 0/1 uniform.</summary>
     public sealed record CharFlag(string Key, bool On);
 
-    /// <summary>A customize colour: its palette index plus the resolved RGB (0–255), published
-    /// as a <c>[r,g,b]</c> (0–1) uniform. The index rides along for shaders that want the raw value.</summary>
-    public sealed record CharColor(string Key, byte Index, byte R, byte G, byte B);
+    /// <summary>A customize colour: its palette index, the resolved RGB (0–255), and the
+    /// 1-based grid cell (<c>Col</c>,<c>Row</c>) it occupies in the in-game 8-wide colour picker
+    /// (so a card can show the "C1R18" the player recognises). Published as an RGB swatch texture,
+    /// a "C{Col}R{Row}" position label, and a <c>[Col,Row]</c> cell uniform.</summary>
+    public sealed record CharColor(string Key, byte Index, byte R, byte G, byte B, int Col, int Row);
 }
