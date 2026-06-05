@@ -26,6 +26,9 @@ namespace Sightseeingway
         // Gear tab
         private readonly GearComponent gear;
 
+        // Character tab
+        private readonly CharacterComponent character;
+
         // Diagnostics
         private readonly DiagnosticsComponent diagnostics;
 
@@ -48,6 +51,7 @@ namespace Sightseeingway
             metadataConfig = new MetadataConfigComponent();
             metadataPreview = new MetadataPreviewComponent();
             gear = new GearComponent();
+            character = new CharacterComponent();
             diagnostics = new DiagnosticsComponent();
         }
 
@@ -78,6 +82,8 @@ namespace Sightseeingway
                 LogVerbosity = config.LogVerbosity,
                 GearPublishEnabled = config.GearPublishEnabled,
                 GearShadingwayPort = config.GearShadingwayPort,
+                CharacterPublishEnabled = config.CharacterPublishEnabled,
+                CharacterColorsEnabled = config.CharacterColorsEnabled,
             };
         }
 
@@ -103,6 +109,12 @@ namespace Sightseeingway
                 if (ImGui.BeginTabItem("Gear"))
                 {
                     if (gear.Render(tempConfig)) configChanged = true;
+                    ImGui.EndTabItem();
+                }
+
+                if (ImGui.BeginTabItem("Character"))
+                {
+                    if (character.Render(tempConfig)) configChanged = true;
                     ImGui.EndTabItem();
                 }
 
@@ -331,6 +343,12 @@ namespace Sightseeingway
             config.GearShadingwayPort = tempConfig.GearShadingwayPort;
             if (gearWasEnabled && !config.GearPublishEnabled)
                 _ = Plugin.GearPublisher?.FlushAsync();
+
+            var charWasEnabled = config.CharacterPublishEnabled;
+            config.CharacterPublishEnabled = tempConfig.CharacterPublishEnabled;
+            config.CharacterColorsEnabled = tempConfig.CharacterColorsEnabled;
+            if (charWasEnabled && !config.CharacterPublishEnabled)
+                _ = Plugin.CharacterPublisher?.FlushAsync();
         }
 
         private void ResetToDefaults()
@@ -342,6 +360,8 @@ namespace Sightseeingway
             tempConfig.LogVerbosity = LogVerbosity.Status;
             tempConfig.GearPublishEnabled = true;
             tempConfig.GearShadingwayPort = 48756;
+            tempConfig.CharacterPublishEnabled = false;
+            tempConfig.CharacterColorsEnabled = false;
             fieldOrdering.InitializeFromString(tempConfig.SelectedFields);
         }
 

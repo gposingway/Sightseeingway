@@ -10,7 +10,7 @@ namespace Sightseeingway
     [Serializable]
     public class Configuration : IPluginConfiguration
     {
-        public const int CurrentVersion = 7;
+        public const int CurrentVersion = 8;
 
         public int Version { get; set; } = CurrentVersion;
 
@@ -61,6 +61,22 @@ namespace Sightseeingway
         /// confirms or corrects this via /hello; this is just the starting guess.
         /// </summary>
         public int GearShadingwayPort { get; set; } = 48756;
+
+        // --- v1.5 additions: Character publishing (identity + appearance → Shadingway) ---
+
+        /// <summary>
+        /// Push the local character's identity + appearance (CHAR_* textures/uniforms) to
+        /// Shadingway. Off by default for the first release — the set is large and a couple of
+        /// colour details want an in-game pass — toggle in the Character tab. Reuses
+        /// <see cref="GearShadingwayPort"/> (same bus/port).
+        /// </summary>
+        public bool CharacterPublishEnabled { get; set; } = false;
+
+        /// <summary>
+        /// Also publish the customize colour swatches + grid-position labels (a noticeably larger
+        /// resident set). Off by default; enable under the Character tab.
+        /// </summary>
+        public bool CharacterColorsEnabled { get; set; } = false;
 
         // --- Deprecated (kept for one version cycle for cross-version safety) ---
 
@@ -131,6 +147,13 @@ namespace Sightseeingway
             {
                 GearPublishEnabled = true;
                 Version = 7;
+            }
+
+            // v8 added Character publishing fields; their initializers (off by default) supply
+            // safe values when absent from an older config, so the bump just records the version.
+            if (Version < 8)
+            {
+                Version = 8;
             }
 #pragma warning restore CS0618
         }

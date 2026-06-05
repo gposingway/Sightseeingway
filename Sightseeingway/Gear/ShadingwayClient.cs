@@ -136,5 +136,54 @@ namespace Sightseeingway.Gear
                 return false;
             }
         }
+
+        /// <summary>
+        /// Publishes a named scalar/vector uniform (1–4 floats) to the bus's uniform channel
+        /// (<c>POST /api/v1/uniforms</c>). A shader reads it with the same
+        /// <c>source="shadingway"; shadingway_key="…"</c> annotation it uses for texture metrics.
+        /// </summary>
+        public async Task<bool> PostUniformAsync(string baseUrl, string name, float[] values, CancellationToken ct)
+        {
+            try
+            {
+                var body = JsonConvert.SerializeObject(new { name, values });
+                using var content = new StringContent(body, Encoding.UTF8, "application/json");
+                using var resp = await _http.PostAsync($"{baseUrl}/uniforms", content, ct);
+                if (!resp.IsSuccessStatusCode)
+                {
+                    var err = await resp.Content.ReadAsStringAsync(ct);
+                    if (err.Length > 200) err = err.Substring(0, 200);
+                    Plugin.Logger?.Debug($"POST uniform {name} → {(int)resp.StatusCode}: {err}");
+                    return false;
+                }
+                return true;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Plugin.Logger?.Debug($"POST uniform {name} failed: {ex.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>Clears one published uniform. True on success (2xx) or 404 (already gone),
+        /// so a failed delete can be retried rather than stranding a stale value.</summary>
+        public async Task<bool> DeleteUniformAsync(string baseUrl, string name, CancellationToken ct)
+        {
+            try
+            {
+                using var resp = await _http.DeleteAsync($"{baseUrl}/uniforms/{name}", ct);
+                if (resp.IsSuccessStatusCode || resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                    return true;
+                Plugin.Logger?.Debug($"DELETE uniform {name} → {(int)resp.StatusCode} (will retry)");
+                return false;
+            }
+            catch (OperationCanceledException) { throw; }
+            catch (Exception ex)
+            {
+                Plugin.Logger?.Debug($"DELETE uniform {name} failed: {ex.Message} (will retry)");
+                return false;
+            }
+        }
     }
 }

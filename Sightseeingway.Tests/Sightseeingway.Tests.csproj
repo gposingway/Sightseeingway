@@ -27,6 +27,8 @@
     <Compile Include="..\Sightseeingway\Gear\GearModels.cs" Link="Linked\Gear\GearModels.cs" />
     <Compile Include="..\Sightseeingway\Gear\TextureNaming.cs" Link="Linked\Gear\TextureNaming.cs" />
     <Compile Include="..\Sightseeingway\Gear\SwatchFactory.cs" Link="Linked\Gear\SwatchFactory.cs" />
+    <Compile Include="..\Sightseeingway\CharacterCard\CharNaming.cs" Link="Linked\CharacterCard\CharNaming.cs" />
+    <Compile Include="..\Sightseeingway\CharacterCard\CharModels.cs" Link="Linked\CharacterCard\CharModels.cs" />
   </ItemGroup>
 
 </Project>

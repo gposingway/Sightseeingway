@@ -41,6 +41,9 @@ namespace Sightseeingway
         // Visible-gear → Shadingway texture publisher (opt-in via config).
         public static Gear.GearPublisher? GearPublisher { get; private set; } = null;
 
+        // Character identity + appearance → Shadingway publisher (opt-in via config).
+        public static CharacterCard.CharacterPublisher? CharacterPublisher { get; private set; } = null;
+
         private readonly List<FileSystemWatcher> screenshotWatchers = [];
         private readonly List<string> directoriesToMonitor = [];
         private FileSystemWatcher? shadingwayWatcher;
@@ -112,6 +115,9 @@ namespace Sightseeingway
                 // Gear publisher subscribes to the framework tick; it stays idle until
                 // the user opts in (Config.GearPublishEnabled).
                 GearPublisher = new Gear.GearPublisher();
+
+                // Character publisher — same pattern, idle until opt-in (Config.CharacterPublishEnabled).
+                CharacterPublisher = new CharacterCard.CharacterPublisher();
 
                 Logger.Debug("Plugin constructor finished.");
             }
@@ -424,6 +430,9 @@ namespace Sightseeingway
             // Stop publishing gear and unhook the framework tick.
             GearPublisher?.Dispose();
             GearPublisher = null;
+
+            CharacterPublisher?.Dispose();
+            CharacterPublisher = null;
 
             // Stop the worker; pending sidecars (if any) survive on disk for the next launch's recovery.
             IO.Pipeline = null;
